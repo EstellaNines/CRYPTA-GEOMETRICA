@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 93f978284b6a5f04386701056829f418, type: 3}
+  m_Name: RoomGeneratorConfig
+  m_EditorClassIdentifier: 
+  parameters:
+    roomWidth: 20
+    roomHeight: 15
+    seed: 639003164977898430
+    useRandomSeed: 1
+    enforceAnchors: 1
+    entranceSide: 0
+    entrancePos: 5
+    exitSide: 1
+    exitPos: 5
+    walkerCount: 1
+    maxSteps: 100
+    turnProbability: 0.2
+    pathWidth: 2
+    initialHolesCount: 2
+    minRoomSize: 3
+    maxRoomSize: 5
+    targetOpenness: 0.4
+    edgePadding: 1
+    maxEnemies: 4
+    minSpawnDistance: 5
+    minGroundSpan: 3
+    minAirHeight: 3
+  themes:
+  - themeName: Y
+    wallTile: {fileID: 11400000, guid: 4141bcb2c475c5a4eaa0d2477c1021b1, type: 2}
+    platformTile: {fileID: 11400000, guid: 01fa3b87bdb662d4cb14e02db0f8cf21, type: 2}
+    singlePlatformTile: {fileID: 11400000, guid: c986ae62ae6926e46af2b14640ac3380, type: 2}
+    backgroundTile: {fileID: 0}
+  - themeName: B
+    wallTile: {fileID: 11400000, guid: 20c8704e376159745b6edfed3bbd415f, type: 2}
+    platformTile: {fileID: 11400000, guid: 8070ccc71046e7a4eafdef14f19a71bf, type: 2}
+    singlePlatformTile: {fileID: 11400000, guid: d73d95f89cb75404894dc6b2fabc5275, type: 2}
+    backgroundTile: {fileID: 0}
+  - themeName: R
+    wallTile: {fileID: 11400000, guid: 2084a04aabe631f48ab11c81890ea946, type: 2}
+    platformTile: {fileID: 11400000, guid: 6175990b7a9a55945a5a1d581ab48462, type: 2}
+    singlePlatformTile: {fileID: 11400000, guid: 0243ea3d93f39ca42b212216cc1b31f1, type: 2}
+    backgroundTile: {fileID: 0}

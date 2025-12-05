@@ -1,0 +1,22 @@
+{
+	"GameData" : {
+		"__type" : "Systems.SaveSystem.GameSaveData,Assembly-CSharp",
+		"value" : {
+			"SaveTime" : "2025-11-29 15:17:28",
+			"SceneName" : "3_Teaching level",
+			"PlayerPosition" : {
+				"x" : 0,
+				"y" : 0,
+				"z" : 0
+			},
+			"PlayerRotation" : {
+				"x" : 0,
+				"y" : 0,
+				"z" : 0,
+				"w" : 1
+			},
+			"CurrentHealth" : 100,
+			"CurrentLives" : 3
+		}
+	}
+}
