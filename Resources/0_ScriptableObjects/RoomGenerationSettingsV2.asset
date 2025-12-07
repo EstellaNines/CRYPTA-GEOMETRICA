@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ad033a301db476445af1e4bac9220375, type: 3}
+  m_Name: RoomGenerationSettingsV2
+  m_EditorClassIdentifier: 
+  parameters:
+    roomWidth: 40
+    roomHeight: 25
+    seed: 
+    useRandomSeed: 1
+    enforceAnchors: 1
+    entranceY: -1
+    exitY: -1
+    entranceClearDepth: 5
+    minBSPSize: 16
+    maxBSPDepth: 4
+    splitRatioRange: {x: 0.4, y: 0.6}
+    roomFillRatio: 0.75
+    roomPadding: 2
+    extraEdgeRatio: 0.2
+    corridorWidth: 3
+    lShapeCorridorChance: 0.7
+    enableBidirectionalWalk: 1
+    walkBrushSize: 3
+    horizontalBias: 0.7
+    enableJumpAnalysis: 1
+    maxJumpHeight: 5
+    maxJumpDistance: 7
+    maxPlatforms: 6
+    platformWidthRange: {x: 3, y: 6}
+    minPlatformWidth: 3
+    maxPlatformWidth: 6
+    platformExclusionRadius: 4
+    maxHorizontalJump: 5
+    playerJumpForce: 8
+    hasDoubleJump: 1
+    minGroundSpan: 4
+    minAirHeight: 4
+    maxEnemies: 5
+    minSpawnDistance: 6
+    edgePadding: 2
+  themes: []
+  wallTilemap: {fileID: 0}
+  platformTilemap: {fileID: 0}
