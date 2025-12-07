@@ -13,28 +13,33 @@ MonoBehaviour:
   m_Name: RoomGeneratorConfig
   m_EditorClassIdentifier: 
   parameters:
-    roomWidth: 20
-    roomHeight: 15
-    seed: 639003164977898430
+    roomWidth: 30
+    roomHeight: 20
+    seed: 639006306759327202
     useRandomSeed: 1
     enforceAnchors: 1
-    entranceSide: 0
-    entrancePos: 5
-    exitSide: 1
-    exitPos: 5
-    walkerCount: 1
+    entranceY: 5
+    exitY: 5
     maxSteps: 100
-    turnProbability: 0.2
     pathWidth: 2
-    initialHolesCount: 2
+    roomSpawnChance: 0.1
     minRoomSize: 3
     maxRoomSize: 5
-    targetOpenness: 0.4
+    walkerCount: 1
+    turnProbability: 0.2
+    allowDiagonal: 0
+    removeSingleWalls: 1
+    maxPlatforms: 4
+    platformWidthMin: 3
+    platformWidthMax: 5
+    minPlatformSize: 2
     edgePadding: 1
-    maxEnemies: 4
-    minSpawnDistance: 5
     minGroundSpan: 3
     minAirHeight: 3
+    maxEnemies: 4
+    minSpawnDistance: 5
+    initialHolesCount: 2
+    targetOpenness: 0.4
   themes:
   - themeName: Y
     wallTile: {fileID: 11400000, guid: 4141bcb2c475c5a4eaa0d2477c1021b1, type: 2}
