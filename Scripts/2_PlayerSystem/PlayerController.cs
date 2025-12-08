@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -22,6 +23,12 @@ namespace CryptaGeometrica.PlayerSystem
         [Tooltip("地面图层，必须设置正确否则无法跳跃")]
         [SerializeField] private LayerMask groundLayer;
 
+        [Header("Platform Settings")]
+        [Tooltip("平台图层（单向平台）")]
+        [SerializeField] private LayerMask platformLayer;
+        [Tooltip("下落穿透持续时间")]
+        [SerializeField] private float platformDropDuration = 0.25f;
+
         [Header("Safety Settings")]
         [Tooltip("掉落重置高度（低于此Y值时重置）")]
         [SerializeField] private float fallThreshold = -20f;
@@ -36,6 +43,7 @@ namespace CryptaGeometrica.PlayerSystem
         private bool _isGrounded;
         private int _remainingJumps;
         private bool _wasGrounded; // 用于检测落地瞬间
+        private bool _isDropping; // 是否正在下落穿透平台
 
         #region Unity Lifecycle
 
@@ -107,13 +115,17 @@ namespace CryptaGeometrica.PlayerSystem
             _moveInput = context.ReadValue<Vector2>();
             
             // 检测跳跃输入 (Y > 0) 且还有跳跃次数
-            // 注意：这里假设 Input System 的 performed 只在按下的瞬间触发一次（对于 Value 类型通常也是值改变时触发）
-            // 如果按住不放持续触发，需要额外加锁，但标准 WASD 绑定通常只在按下和松开时触发
             if (_moveInput.y > 0.5f && _remainingJumps > 0)
             {
                 Jump();
             }
-
+            
+            // 检测下落穿透输入 (Y < 0)，在平台上时穿透下落
+            if (_moveInput.y < -0.5f && _isGrounded && !_isDropping)
+            {
+                TryDropThroughPlatform();
+            }
+            
             CheckFlip();
         }
 
@@ -140,12 +152,14 @@ namespace CryptaGeometrica.PlayerSystem
 
         private void CheckGrounded()
         {
-            // 使用 BoxCast 检测脚底
+            // 使用 BoxCast 检测脚底（同时检测地面和平台）
             Bounds bounds = _col.bounds;
             Vector2 size = new Vector2(bounds.size.x * 0.9f, 0.1f);
             Vector2 origin = new Vector2(bounds.center.x, bounds.min.y - 0.05f);
 
-            RaycastHit2D hit = Physics2D.BoxCast(origin, size, 0f, Vector2.down, 0.05f, groundLayer);
+            // 合并地面和平台图层进行检测
+            LayerMask combinedLayers = groundLayer | platformLayer;
+            RaycastHit2D hit = Physics2D.BoxCast(origin, size, 0f, Vector2.down, 0.05f, combinedLayers);
             _isGrounded = hit.collider != null;
 
             // 只有在接触地面且未处于上升状态（避免起跳瞬间立刻重置）时重置跳跃次数
@@ -176,6 +190,64 @@ namespace CryptaGeometrica.PlayerSystem
             Vector3 currentScale = transform.localScale;
             currentScale.x *= -1;
             transform.localScale = currentScale;
+        }
+
+        #endregion
+
+        #region Platform Drop Logic
+
+        /// <summary>
+        /// 尝试穿透平台下落
+        /// </summary>
+        private void TryDropThroughPlatform()
+        {
+            // 使用 OverlapBox 检测脚底区域是否有平台
+            Bounds bounds = _col.bounds;
+            Vector2 center = new Vector2(bounds.center.x, bounds.min.y);
+            Vector2 size = new Vector2(bounds.size.x * 0.8f, 0.3f);
+            
+            Collider2D hit = Physics2D.OverlapBox(center, size, 0f, platformLayer);
+            
+            if (hit != null)
+            {
+                // 获取平台的 PlatformEffector2D
+                PlatformEffector2D effector = hit.GetComponent<PlatformEffector2D>();
+                if (effector == null)
+                {
+                    // 如果是 CompositeCollider2D，尝试从父对象获取
+                    effector = hit.GetComponentInParent<PlatformEffector2D>();
+                }
+                
+                if (effector != null)
+                {
+                    StartCoroutine(DropThroughPlatformCoroutine(effector));
+                }
+            }
+        }
+
+        /// <summary>
+        /// 平台穿透协程：临时修改 PlatformEffector2D 的旋转偏移
+        /// </summary>
+        private IEnumerator DropThroughPlatformCoroutine(PlatformEffector2D effector)
+        {
+            _isDropping = true;
+            
+            // 保存原始旋转偏移
+            float originalOffset = effector.rotationalOffset;
+            
+            // 将旋转偏移设为 180，让碰撞弧形朝下，允许从上往下穿透
+            effector.rotationalOffset = 180f;
+            
+            // 等待玩家穿过平台
+            yield return new WaitForSeconds(platformDropDuration);
+            
+            // 恢复原始旋转偏移
+            if (effector != null)
+            {
+                effector.rotationalOffset = originalOffset;
+            }
+            
+            _isDropping = false;
         }
 
         #endregion

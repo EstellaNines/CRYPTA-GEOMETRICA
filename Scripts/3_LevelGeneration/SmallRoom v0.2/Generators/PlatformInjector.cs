@@ -93,16 +93,72 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             // 添加入口/出口保护区
             AddEntranceExitExclusion(roomData);
             
-            // Step 1: 分析垂直落差并注入平台
+            // Step 1: 在每个房间内部注入阶梯式平台
+            InjectPlatformsInRooms(roomData);
+            
+            // Step 2: 分析垂直落差并注入平台
             AnalyzeAndInjectByColumn(roomData);
             
-            // Step 2: 分析水平跳跃距离
+            // Step 3: 分析水平跳跃距离
             AnalyzeHorizontalGaps(roomData);
             
-            // Step 3: 验证可达性并修复
+            // Step 4: 验证可达性并修复
             FixUnreachableAreas(roomData);
             
             Debug.Log($"[PlatformInjector] 平台注入完成: 放置={platformsPlaced}, 分析落差={gapsAnalyzed}, 修复不可达={unreachableFixed}");
+        }
+        
+        #endregion
+
+        #region 房间内部平台注入
+        
+        /// <summary>
+        /// 在每个房间内部注入阶梯式平台
+        /// </summary>
+        private void InjectPlatformsInRooms(RoomDataV2 roomData)
+        {
+            if (roomData.roomGraph == null || roomData.roomGraph.rooms == null) return;
+            
+            foreach (var room in roomData.roomGraph.rooms)
+            {
+                // 跳过太小的房间
+                if (room.Height <= maxJumpHeight * 2) continue;
+                
+                // 计算房间内需要的平台数量
+                int effectiveJumpHeight = hasDoubleJump ? maxJumpHeight * 2 - 2 : maxJumpHeight;
+                int platformsNeeded = Mathf.CeilToInt((float)(room.Height - 4) / effectiveJumpHeight) - 1;
+                
+                if (platformsNeeded <= 0) continue;
+                
+                // 计算平台间距
+                int spacing = (room.Height - 4) / (platformsNeeded + 1);
+                spacing = Mathf.Max(spacing, effectiveJumpHeight - 2);
+                
+                // 在房间内放置阶梯式平台（左右交替）
+                for (int i = 1; i <= platformsNeeded && platformsPlaced < parameters.maxPlatforms; i++)
+                {
+                    int platformY = room.Bottom + 2 + spacing * i;
+                    
+                    // 左右交替放置，形成之字形路径
+                    int platformX;
+                    if (i % 2 == 1)
+                    {
+                        // 奇数层放在左侧
+                        platformX = room.Left + room.Width / 4;
+                    }
+                    else
+                    {
+                        // 偶数层放在右侧
+                        platformX = room.Right - room.Width / 4;
+                    }
+                    
+                    // 验证位置有效性
+                    if (IsValidPlatformPosition(platformX, platformY, roomData))
+                    {
+                        PlacePlatform(platformX, platformY, roomData);
+                    }
+                }
+            }
         }
         
         #endregion
@@ -385,23 +441,54 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
         }
         
         /// <summary>
-        /// 在两点之间修复路径
+        /// 在两点之间修复路径（递归放置多个平台）
         /// </summary>
-        private void FixPathBetween(Vector2Int from, Vector2Int to, RoomDataV2 roomData)
+        private void FixPathBetween(Vector2Int from, Vector2Int to, RoomDataV2 roomData, int depth = 0)
         {
-            int dy = to.y - from.y;
+            // 防止无限递归
+            if (depth > 10 || platformsPlaced >= parameters.maxPlatforms) return;
             
-            if (Mathf.Abs(dy) > maxJumpHeight)
+            int dy = Mathf.Abs(to.y - from.y);
+            int dx = Mathf.Abs(to.x - from.x);
+            int effectiveJumpHeight = hasDoubleJump ? maxJumpHeight * 2 - 2 : maxJumpHeight;
+            
+            // 如果高度差超过跳跃高度，需要添加平台
+            if (dy > effectiveJumpHeight || dx > parameters.maxHorizontalJump)
             {
-                // 需要添加中间平台
+                // 计算中间点
                 int midY = (from.y + to.y) / 2;
                 int midX = (from.x + to.x) / 2;
                 
-                if (IsValidPlatformPosition(midX, midY, roomData))
+                // 尝试在中间点放置平台
+                bool placed = false;
+                
+                // 在中间点附近搜索有效位置
+                for (int offsetX = 0; offsetX <= 3 && !placed; offsetX++)
                 {
-                    PlacePlatform(midX, midY, roomData);
+                    for (int sign = -1; sign <= 1 && !placed; sign += 2)
+                    {
+                        int testX = midX + offsetX * sign;
+                        if (IsValidPlatformPosition(testX, midY, roomData))
+                        {
+                            PlacePlatform(testX, midY, roomData);
+                            placed = true;
+                            
+                            // 递归修复上半部分和下半部分
+                            Vector2Int mid = new Vector2Int(testX, midY);
+                            FixPathBetween(from, mid, roomData, depth + 1);
+                            FixPathBetween(mid, to, roomData, depth + 1);
+                        }
+                    }
                 }
             }
+        }
+        
+        /// <summary>
+        /// 在两点之间修复路径（重载，保持向后兼容）
+        /// </summary>
+        private void FixPathBetween(Vector2Int from, Vector2Int to, RoomDataV2 roomData)
+        {
+            FixPathBetween(from, to, roomData, 0);
         }
         
         /// <summary>
