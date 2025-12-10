@@ -15,19 +15,19 @@ MonoBehaviour:
   themes:
   - themeName: B
     wallTile: {fileID: 11400000, guid: 20c8704e376159745b6edfed3bbd415f, type: 2}
-    platformTile: {fileID: 11400000, guid: 8070ccc71046e7a4eafdef14f19a71bf, type: 2}
+    platformTile: {fileID: 11400000, guid: 13ba69c974cfea641a601a50acd1246d, type: 2}
     singlePlatformTile: {fileID: 11400000, guid: d73d95f89cb75404894dc6b2fabc5275, type: 2}
     backgroundTile: {fileID: 0}
     themeColor: {r: 0, g: 0.51636195, b: 1, a: 1}
   - themeName: Y
     wallTile: {fileID: 11400000, guid: 4141bcb2c475c5a4eaa0d2477c1021b1, type: 2}
-    platformTile: {fileID: 11400000, guid: 01fa3b87bdb662d4cb14e02db0f8cf21, type: 2}
+    platformTile: {fileID: 11400000, guid: 63de699302239e045b08549b6355e756, type: 2}
     singlePlatformTile: {fileID: 11400000, guid: c986ae62ae6926e46af2b14640ac3380, type: 2}
     backgroundTile: {fileID: 0}
     themeColor: {r: 1, g: 0.684497, b: 0, a: 1}
   - themeName: R
     wallTile: {fileID: 11400000, guid: 2084a04aabe631f48ab11c81890ea946, type: 2}
-    platformTile: {fileID: 11400000, guid: 6175990b7a9a55945a5a1d581ab48462, type: 2}
+    platformTile: {fileID: 11400000, guid: 1576ee3888ed8604ca469064686bc4c9, type: 2}
     singlePlatformTile: {fileID: 11400000, guid: 0243ea3d93f39ca42b212216cc1b31f1, type: 2}
     backgroundTile: {fileID: 0}
     themeColor: {r: 1, g: 0, b: 0, a: 1}
