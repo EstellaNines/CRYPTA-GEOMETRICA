@@ -63,6 +63,11 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
         /// </summary>
         public string seed;
         
+        /// <summary>
+        /// 是否需要在出口处放置门（Boss房间专用）
+        /// </summary>
+        public bool needsDoorAtExit;
+        
         #endregion
 
         #region 属性

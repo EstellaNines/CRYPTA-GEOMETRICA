@@ -23,6 +23,9 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
         [LabelText("单格平台瓦片"), Tooltip("独立的 1x1 浮空平台 (可选)")]
         public TileBase singlePlatformTile;
         
+        [LabelText("门瓦片"), Tooltip("Boss房间专用门砖块")]
+        public TileBase doorTile;
+        
         [LabelText("背景瓦片"), Tooltip("背景墙 (可选)")]
         public TileBase backgroundTile;
         

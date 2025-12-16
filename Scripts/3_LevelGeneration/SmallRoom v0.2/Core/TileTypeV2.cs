@@ -46,7 +46,12 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
         /// <summary>
         /// 空中敌人（飞蛾等）
         /// </summary>
-        Air
+        Air,
+        
+        /// <summary>
+        /// Boss 敌人
+        /// </summary>
+        Boss
     }
 
     /// <summary>
@@ -65,34 +70,6 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
         Vertical
     }
 
-    /// <summary>
-    /// 房间类型（用于游戏设计）
-    /// </summary>
-    public enum RoomType
-    {
-        /// <summary>
-        /// 连接房（走廊/过渡区域）
-        /// </summary>
-        Connector,
-        
-        /// <summary>
-        /// 休息房（安全区域，无敌人）
-        /// </summary>
-        Rest,
-        
-        /// <summary>
-        /// 战斗房（有敌人生成点）
-        /// </summary>
-        Combat,
-        
-        /// <summary>
-        /// 入口房
-        /// </summary>
-        Entrance,
-        
-        /// <summary>
-        /// 出口房
-        /// </summary>
-        Exit
-    }
+    // RoomType 已移至 CryptaGeometrica.LevelGeneration.MultiRoom 命名空间
+    // 请使用 MultiRoom.RoomType
 }

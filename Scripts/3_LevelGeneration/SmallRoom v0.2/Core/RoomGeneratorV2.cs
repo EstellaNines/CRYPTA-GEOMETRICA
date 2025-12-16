@@ -25,6 +25,10 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
         [LabelText("平台层 Tilemap"), Tooltip("用于放置单向平台")]
         public Tilemap platformTilemap;
         
+        [TitleGroup("Tilemap 配置")]
+        [LabelText("门层 Tilemap"), Tooltip("用于Boss房间的门（Boss击杀后消失）")]
+        public Tilemap doorTilemap;
+        
         [TitleGroup("视觉主题", "Visual Themes", TitleAlignments.Centered)]
         [LabelText("主题列表")]
         [ListDrawerSettings(ShowIndexLabels = true, ListElementLabelName = "themeName")]
@@ -83,31 +87,27 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             InitializeGrid();
             SelectTheme();
             
-            // Phase 2: BSP 空间分割
-            GenerateBSP();
-            
-            // Phase 3: 房间生成
-            PlaceRooms();
-            
-            // Phase 4: 图连接
-            BuildRoomGraph();
-            
-            // Phase 5: 走廊生成
-            GenerateCorridors();
-            
-            // Phase 6: 连通性保障（双向随机游走）
-            EnsureConnectivity();
-            
-            // Phase 7: 平台注入
-            InjectPlatforms();
-            
-            // Phase 8: 后处理
-            PostProcess();
+            // 根据房间类型选择生成流程
+            switch (parameters.roomType)
+            {
+                case MultiRoom.RoomType.Entrance:
+                    GenerateEntranceRoom();
+                    break;
+                    
+                case MultiRoom.RoomType.Boss:
+                    GenerateBossRoom();
+                    break;
+                    
+                case MultiRoom.RoomType.Combat:
+                default:
+                    GenerateStandardRoom();
+                    break;
+            }
             
             // 重建地面列表
             currentRoom.RebuildFloorTiles();
             
-            Debug.Log($"[RoomGeneratorV2] 房间生成完成: {currentRoom}");
+            Debug.Log($"[RoomGeneratorV2] 房间生成完成: {currentRoom} (类型: {parameters.roomType})");
         }
         
         /// <summary>
@@ -128,6 +128,10 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             if (platformTilemap != null)
             {
                 platformTilemap.ClearAllTiles();
+            }
+            if (doorTilemap != null)
+            {
+                doorTilemap.ClearAllTiles();
             }
             
             // 烘焙填充：在房间数据外围额外画几圈墙
@@ -150,6 +154,12 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
                     }
                 }
             }
+            
+            // 烘焙生成点可视化
+            BakeSpawnPoints();
+            
+            // 烘焙Boss房间的门
+            BakeBossDoor();
             
             // 广播消息
             BroadcastRoomAnchors();
@@ -219,6 +229,57 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             {
                 currentTheme = themes[random.Next(themes.Count)];
             }
+        }
+        
+        #endregion
+
+        #region 房间类型生成流程
+        
+        /// <summary>
+        /// 生成标准战斗房间（原有流程）
+        /// </summary>
+        private void GenerateStandardRoom()
+        {
+            // Phase 2: BSP 空间分割
+            GenerateBSP();
+            
+            // Phase 3: 房间生成
+            PlaceRooms();
+            
+            // Phase 4: 图连接
+            BuildRoomGraph();
+            
+            // Phase 5: 走廊生成
+            GenerateCorridors();
+            
+            // Phase 6: 连通性保障
+            EnsureConnectivity();
+            
+            // Phase 7: 平台注入
+            InjectPlatforms();
+            
+            // Phase 8: 后处理
+            PostProcess();
+        }
+        
+        /// <summary>
+        /// 生成入口房间
+        /// </summary>
+        private void GenerateEntranceRoom()
+        {
+            SpecialRoomGenerator.GenerateEntranceRoom(currentRoom, parameters, random);
+            
+            // 入口房间不需要后处理（无生成点、无平台注入）
+        }
+        
+        /// <summary>
+        /// 生成Boss房间
+        /// </summary>
+        private void GenerateBossRoom()
+        {
+            SpecialRoomGenerator.GenerateBossRoom(currentRoom, parameters, random);
+            
+            // Boss房间不需要后处理（生成点已在 SpecialRoomGenerator 中设置）
         }
         
         #endregion
@@ -693,6 +754,100 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             }
         }
         
+        private void BakeBossDoor()
+        {
+            if (currentRoom == null || !currentRoom.needsDoorAtExit || doorTilemap == null) return;
+            
+            // 使用专门的门砖块，如果没有则使用墙壁砖块
+            TileBase doorTileToUse = currentTheme.doorTile != null ? currentTheme.doorTile : currentTheme.wallTile;
+            
+            if (doorTileToUse == null)
+            {
+                Debug.LogWarning("[RoomGeneratorV2] 没有可用的门砖块");
+                return;
+            }
+            
+            // 在出口位置放置门：宽2格 x 高3格
+            int doorX = currentRoom.endPos.x;
+            int doorY = currentRoom.endPos.y;
+            
+            // 放置6个砖块（2列 x 3行）
+            for (int x = 0; x < 2; x++)
+            {
+                for (int y = 0; y < 3; y++)
+                {
+                    Vector3Int doorPos = new Vector3Int(doorX + x, doorY + y, 0);
+                    doorTilemap.SetTile(doorPos, doorTileToUse);
+                }
+            }
+            
+            Debug.Log($"[RoomGeneratorV2] 烘焙Boss门: 位置({doorX}, {doorY})，尺寸2x3，使用砖块: {doorTileToUse.name}");
+        }
+        
+        private void BakeSpawnPoints()
+        {
+            if (currentRoom == null || currentRoom.potentialSpawns == null) return;
+            
+            // 清理旧的生成点
+            Transform spawnContainer = transform.Find("SpawnPoints");
+            if (spawnContainer != null)
+            {
+                DestroyImmediate(spawnContainer.gameObject);
+            }
+            
+            // 创建容器
+            GameObject container = new GameObject("SpawnPoints");
+            container.transform.SetParent(transform);
+            container.transform.localPosition = Vector3.zero;
+            
+            // 为每个生成点创建可视化GameObject
+            for (int i = 0; i < currentRoom.potentialSpawns.Count; i++)
+            {
+                SpawnPointV2 spawn = currentRoom.potentialSpawns[i];
+                
+                // 创建生成点GameObject
+                GameObject spawnObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                spawnObj.name = $"SpawnPoint_{i}_{spawn.type}";
+                spawnObj.transform.SetParent(container.transform);
+                
+                // 设置位置
+                Vector3 worldPos = targetTilemap.CellToWorld(new Vector3Int(spawn.position.x, spawn.position.y, 0));
+                spawnObj.transform.position = worldPos + new Vector3(0.5f, 0.5f, 0);
+                spawnObj.transform.localScale = Vector3.one * 0.8f;
+                
+                // 根据类型设置颜色
+                Renderer renderer = spawnObj.GetComponent<Renderer>();
+                if (renderer != null)
+                {
+                    Material mat = new Material(Shader.Find("Sprites/Default"));
+                    
+                    switch (spawn.type)
+                    {
+                        case SpawnType.Boss:
+                            mat.color = Color.yellow; // Boss生成点：黄色
+                            break;
+                        case SpawnType.Air:
+                            mat.color = Color.magenta; // 空中小怪：粉色
+                            break;
+                        case SpawnType.Ground:
+                            mat.color = Color.cyan; // 地面小怪：青色
+                            break;
+                    }
+                    
+                    renderer.material = mat;
+                }
+                
+                // 移除碰撞体
+                Collider collider = spawnObj.GetComponent<Collider>();
+                if (collider != null)
+                {
+                    DestroyImmediate(collider);
+                }
+            }
+            
+            Debug.Log($"[RoomGeneratorV2] 烘焙生成点: {currentRoom.potentialSpawns.Count} 个");
+        }
+        
         private void BroadcastRoomAnchors()
         {
             if (currentRoom == null || targetTilemap == null) return;
@@ -726,6 +881,60 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
                           $"[方位/Direction] Entrance: Left | Exit: Right\n" +
                           $"[瓦片坐标/Grid] Entrance: {currentRoom.startPos} | Exit: {currentRoom.endPos}\n" +
                           $"[世界坐标/World] Entrance: {startWorld} | Exit: {endWorld}");
+            }
+        }
+        
+        #endregion
+        
+        #region Gizmos 可视化
+        
+        private void OnDrawGizmos()
+        {
+            if (currentRoom == null || currentRoom.potentialSpawns == null || targetTilemap == null) return;
+            
+            // 绘制生成点
+            foreach (var spawn in currentRoom.potentialSpawns)
+            {
+                Vector3 worldPos = targetTilemap.CellToWorld(new Vector3Int(spawn.position.x, spawn.position.y, 0));
+                worldPos += new Vector3(0.5f, 0.5f, 0); // 居中
+                
+                // 根据类型设置颜色
+                switch (spawn.type)
+                {
+                    case SpawnType.Boss:
+                        Gizmos.color = Color.yellow; // Boss生成点：黄色
+                        break;
+                    case SpawnType.Air:
+                        Gizmos.color = Color.magenta; // 空中小怪：粉色
+                        break;
+                    case SpawnType.Ground:
+                        Gizmos.color = Color.cyan; // 地面小怪：青色
+                        break;
+                }
+                
+                // 绘制立方体
+                Gizmos.DrawCube(worldPos, Vector3.one * 0.8f);
+                
+                // 绘制线框
+                Gizmos.color = Color.white;
+                Gizmos.DrawWireCube(worldPos, Vector3.one * 0.8f);
+            }
+            
+            // 绘制出入口
+            if (currentRoom.startPos != Vector2Int.zero)
+            {
+                Vector3 startWorld = targetTilemap.CellToWorld(new Vector3Int(currentRoom.startPos.x, currentRoom.startPos.y, 0));
+                startWorld += new Vector3(0.5f, 0.5f, 0);
+                Gizmos.color = Color.green;
+                Gizmos.DrawWireSphere(startWorld, 0.5f);
+            }
+            
+            if (currentRoom.endPos != Vector2Int.zero)
+            {
+                Vector3 endWorld = targetTilemap.CellToWorld(new Vector3Int(currentRoom.endPos.x, currentRoom.endPos.y, 0));
+                endWorld += new Vector3(0.5f, 0.5f, 0);
+                Gizmos.color = Color.red;
+                Gizmos.DrawWireSphere(endWorld, 0.5f);
             }
         }
         

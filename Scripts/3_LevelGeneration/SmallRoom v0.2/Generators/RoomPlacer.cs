@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using CryptaGeometrica.LevelGeneration.MultiRoom;
 
 namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
 {

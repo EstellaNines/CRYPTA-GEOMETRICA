@@ -43,6 +43,11 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
         [LabelText("目标 Tilemap（平台层）")]
         public Tilemap platformTilemap;
         
+        [TitleGroup("配置")]
+        [LabelText("目标 Tilemap（门层）")]
+        [InfoBox("Boss房间专用，用于放置可消失的门", InfoMessageType.Info)]
+        public Tilemap doorTilemap;
+        
         #endregion
 
         #region 生成参数
@@ -187,6 +192,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
                 generator.parameters = GetCurrentParams();
                 generator.targetTilemap = targetTilemap;
                 generator.platformTilemap = platformTilemap;
+                generator.doorTilemap = doorTilemap;
                 generator.themes = themes;
                 
                 // 生成
@@ -228,6 +234,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
                 EnsureGenerator();
                 generator.targetTilemap = targetTilemap;
                 generator.platformTilemap = platformTilemap;
+                generator.doorTilemap = doorTilemap;
                 generator.themes = themes;
                 generator.SetRoomData(lastGeneratedRoom);
                 generator.ForcePickTheme();
@@ -263,6 +270,12 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
                 platformTilemap.ClearAllTiles();
             }
             
+            if (doorTilemap != null)
+            {
+                Undo.RecordObject(doorTilemap, "Clear Door Tilemap");
+                doorTilemap.ClearAllTiles();
+            }
+            
             Debug.Log("[RoomGenerationWindowV2] Tilemap 已清空");
         }
         
@@ -292,6 +305,90 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             }
             
             Debug.Log("[RoomGenerationWindowV2] 参数已重置");
+        }
+        
+        [TitleGroup("操作")]
+        [Button("自动识别 Tilemaps 和主题配置", ButtonSizes.Large), GUIColor(0.3f, 0.8f, 0.9f)]
+        private void AutoDetectResources()
+        {
+            int foundCount = 0;
+            
+            // 1. 查找场景中的 Tilemaps
+            if (targetTilemap == null)
+            {
+                var walls = GameObject.Find("Walls");
+                if (walls != null)
+                {
+                    targetTilemap = walls.GetComponent<Tilemap>();
+                    if (targetTilemap != null)
+                    {
+                        foundCount++;
+                        Debug.Log("[RoomGenerationWindowV2] 找到墙壁层 Tilemap: Walls");
+                    }
+                }
+            }
+            
+            if (platformTilemap == null)
+            {
+                var platforms = GameObject.Find("Platforms");
+                if (platforms != null)
+                {
+                    platformTilemap = platforms.GetComponent<Tilemap>();
+                    if (platformTilemap != null)
+                    {
+                        foundCount++;
+                        Debug.Log("[RoomGenerationWindowV2] 找到平台层 Tilemap: Platforms");
+                    }
+                }
+            }
+            
+            if (doorTilemap == null)
+            {
+                var door = GameObject.Find("Door");
+                if (door != null)
+                {
+                    doorTilemap = door.GetComponent<Tilemap>();
+                    if (doorTilemap != null)
+                    {
+                        foundCount++;
+                        Debug.Log("[RoomGenerationWindowV2] 找到门层 Tilemap: Door");
+                    }
+                }
+            }
+            
+            // 2. 查找项目中的 RoomThemeConfig
+            if (themeConfig == null)
+            {
+                string[] guids = AssetDatabase.FindAssets("t:RoomThemeConfigSO");
+                if (guids.Length > 0)
+                {
+                    string path = AssetDatabase.GUIDToAssetPath(guids[0]);
+                    themeConfig = AssetDatabase.LoadAssetAtPath<RoomThemeConfigSO>(path);
+                    if (themeConfig != null)
+                    {
+                        foundCount++;
+                        Debug.Log($"[RoomGenerationWindowV2] 找到主题配置: {themeConfig.name}");
+                    }
+                }
+            }
+            
+            // 3. 显示结果
+            if (foundCount > 0)
+            {
+                EditorUtility.DisplayDialog("自动识别完成", 
+                    $"成功识别 {foundCount} 个资源\n\n" +
+                    $"墙壁层: {(targetTilemap != null ? "✓" : "✗")}\n" +
+                    $"平台层: {(platformTilemap != null ? "✓" : "✗")}\n" +
+                    $"门层: {(doorTilemap != null ? "✓" : "✗")}\n" +
+                    $"主题配置: {(themeConfig != null ? "✓" : "✗")}", 
+                    "确定");
+            }
+            else
+            {
+                EditorUtility.DisplayDialog("自动识别", 
+                    "未找到任何资源\n\n请确保场景中存在名为 'Walls'、'Platforms'、'Door' 的 GameObject，\n并且项目中存在 RoomThemeConfigSO 资源", 
+                    "确定");
+            }
         }
         
         #endregion
@@ -589,15 +686,25 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             {
                 Vector3 pos = new Vector3(spawn.position.x, spawn.position.y, 0);
                 
-                if (spawn.type == SpawnType.Ground)
+                switch (spawn.type)
                 {
-                    Handles.color = Color.red;
-                    Handles.DrawSolidDisc(pos, Vector3.forward, 0.5f);
-                }
-                else
-                {
-                    Handles.color = Color.magenta;
-                    Handles.DrawWireDisc(pos, Vector3.forward, 0.5f);
+                    case SpawnType.Boss:
+                        // Boss生成点：黄色实心圆
+                        Handles.color = Color.yellow;
+                        Handles.DrawSolidDisc(pos, Vector3.forward, 0.8f);
+                        Handles.color = Color.white;
+                        Handles.DrawWireDisc(pos, Vector3.forward, 0.8f);
+                        break;
+                    case SpawnType.Ground:
+                        // 地面小怪：青色实心圆
+                        Handles.color = Color.cyan;
+                        Handles.DrawSolidDisc(pos, Vector3.forward, 0.5f);
+                        break;
+                    case SpawnType.Air:
+                        // 空中小怪：粉色线框圆
+                        Handles.color = Color.magenta;
+                        Handles.DrawWireDisc(pos, Vector3.forward, 0.5f);
+                        break;
                 }
             }
         }
@@ -938,12 +1045,38 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             {
                 float x = spawn.position.x * scale + offsetX;
                 float y = (height - spawn.position.y) * scale + offsetY;
-                float size = Mathf.Max(4, scale * 0.8f);
                 
-                Color color = spawn.type == SpawnType.Ground ? Color.red : Color.magenta;
+                Color color;
+                float size;
+                bool filled;
+                
+                switch (spawn.type)
+                {
+                    case SpawnType.Boss:
+                        // Boss生成点：黄色实心方块（更大）
+                        color = Color.yellow;
+                        size = Mathf.Max(6, scale * 1.2f);
+                        filled = true;
+                        break;
+                    case SpawnType.Ground:
+                        // 地面小怪：青色实心方块
+                        color = Color.cyan;
+                        size = Mathf.Max(4, scale * 0.8f);
+                        filled = true;
+                        break;
+                    case SpawnType.Air:
+                        // 空中小怪：粉色线框方块
+                        color = Color.magenta;
+                        size = Mathf.Max(4, scale * 0.8f);
+                        filled = false;
+                        break;
+                    default:
+                        continue;
+                }
+                
                 Rect spawnRect = new Rect(x - size/2, y - size/2, size, size);
                 
-                if (spawn.type == SpawnType.Ground)
+                if (filled)
                 {
                     EditorGUI.DrawRect(spawnRect, color);
                 }
@@ -995,7 +1128,8 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
                 (new Color(0.9f, 0.7f, 0.2f), "平台"),
                 (Color.green, "入口"),
                 (Color.red, "出口"),
-                (Color.red, "地面生成点"),
+                (Color.yellow, "Boss生成点"),
+                (Color.cyan, "地面生成点"),
                 (Color.magenta, "空中生成点"),
             };
             

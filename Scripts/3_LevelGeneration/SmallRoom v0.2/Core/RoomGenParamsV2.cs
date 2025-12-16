@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using Sirenix.OdinInspector;
+using CryptaGeometrica.LevelGeneration.MultiRoom;
 
 namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
 {
@@ -14,6 +15,10 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
         #region 基础设置
         
         [TitleGroup("基础设置", "Basic Settings", TitleAlignments.Centered)]
+        [LabelText("房间类型"), Tooltip("选择房间生成类型")]
+        public MultiRoom.RoomType roomType = MultiRoom.RoomType.Combat;
+        
+        [TitleGroup("基础设置")]
         [LabelText("房间宽度"), Range(20, 100)]
         public int roomWidth = 40;
         
@@ -192,6 +197,35 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
         [TitleGroup("安全区", "Safety Settings", TitleAlignments.Centered)]
         [LabelText("边缘留空"), Range(1, 4)]
         public int edgePadding = 2;
+        
+        #endregion
+
+        #region 特殊房间配置
+        
+        [TitleGroup("特殊房间配置", "Special Room Settings", TitleAlignments.Centered)]
+        [LabelText("入口房间：平台数量"), Range(2, 5)]
+        [ShowIf("roomType", MultiRoom.RoomType.Entrance)]
+        public int entrancePlatformCount = 3;
+        
+        [TitleGroup("特殊房间配置")]
+        [LabelText("入口房间：平台高度范围")]
+        [ShowIf("roomType", MultiRoom.RoomType.Entrance)]
+        public Vector2Int entrancePlatformHeightRange = new Vector2Int(10, 25);
+        
+        [TitleGroup("特殊房间配置")]
+        [LabelText("Boss房间：竞技场宽度"), Range(60, 120)]
+        [ShowIf("roomType", MultiRoom.RoomType.Boss)]
+        public int bossArenaWidth = 80;
+        
+        [TitleGroup("特殊房间配置")]
+        [LabelText("Boss房间：竞技场高度"), Range(40, 80)]
+        [ShowIf("roomType", MultiRoom.RoomType.Boss)]
+        public int bossArenaHeight = 50;
+        
+        [TitleGroup("特殊房间配置")]
+        [LabelText("Boss房间：平台层数"), Range(2, 4)]
+        [ShowIf("roomType", MultiRoom.RoomType.Boss)]
+        public int bossPlatformLayers = 3;
         
         #endregion
 
