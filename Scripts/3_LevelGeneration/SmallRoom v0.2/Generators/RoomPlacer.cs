@@ -44,7 +44,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
         {
             if (bspRoot == null)
             {
-                Debug.LogWarning("[RoomPlacer] BSP 根节点为空");
+                // BSP 根节点为空
                 return new List<RoomRegion>();
             }
             
@@ -66,7 +66,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
                 }
             }
             
-            Debug.Log($"[RoomPlacer] 放置了 {rooms.Count} 个房间");
+            // 房间放置完成
             
             return rooms;
         }
@@ -105,14 +105,14 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             {
                 entranceRoom.isEntrance = true;
                 entranceRoom.roomType = RoomType.Entrance;
-                Debug.Log($"[RoomPlacer] 入口房间: {entranceRoom}");
+                // 入口房间标记
             }
             
             if (exitRoom != null)
             {
                 exitRoom.isExit = true;
                 exitRoom.roomType = RoomType.Exit;
-                Debug.Log($"[RoomPlacer] 出口房间: {exitRoom}");
+                // 出口房间标记
             }
             
             // 分配其他房间类型
@@ -161,7 +161,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
                     combatCount++;
                 }
                 
-                Debug.Log($"[RoomPlacer] 房间类型分配: {room}");
+                // 房间类型分配
             }
         }
         
@@ -192,7 +192,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             // 如果空间不足，返回 null
             if (roomWidth < minSize || roomHeight < minSize)
             {
-                Debug.LogWarning($"[RoomPlacer] 叶节点 {leafBounds} 空间不足，跳过");
+                // 叶节点空间不足，跳过
                 return null;
             }
             

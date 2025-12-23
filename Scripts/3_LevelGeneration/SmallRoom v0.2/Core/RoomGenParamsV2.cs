@@ -175,6 +175,10 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
         #region 敌人生成
         
         [TitleGroup("敌人生成", "Spawn Settings", TitleAlignments.Centered)]
+        [LabelText("房间难度"), Tooltip("决定敌人配置")]
+        public RoomDifficulty roomDifficulty = RoomDifficulty.Normal;
+        
+        [TitleGroup("敌人生成")]
         [LabelText("最小地面连续长度"), Range(3, 8), Tooltip("地面敌人生成点需要的最小连续地面")]
         public int minGroundSpan = 4;
         
@@ -252,6 +256,14 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
                 platformWidthRange = new Vector2Int(platformWidthRange.y, platformWidthRange.x);
             }
             platformWidthRange.x = Mathf.Max(platformWidthRange.x, 3);
+        }
+        
+        /// <summary>
+        /// 克隆参数对象
+        /// </summary>
+        public RoomGenParamsV2 Clone()
+        {
+            return (RoomGenParamsV2)this.MemberwiseClone();
         }
         
         #endregion

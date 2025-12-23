@@ -136,7 +136,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
                 }
             }
             
-            Debug.Log($"[MinimumSpanningTree] 生成了 {mst.Count} 条 MST 边");
+            // MST生成完成
             
             return mst;
         }
@@ -193,7 +193,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
                 remaining.RemoveAt(index);
             }
             
-            Debug.Log($"[MinimumSpanningTree] 选择了 {extraEdges.Count} 条额外边");
+            // 额外边选择完成
             
             return extraEdges;
         }

@@ -81,7 +81,7 @@ namespace CryptaGeometrica.LevelGeneration.MultiRoom
         {
             if (levelData == null || levelData.rooms == null || levelData.rooms.Count < 2)
             {
-                Debug.LogWarning("[LCorridorBuilder] 房间数量不足，无法生成走廊");
+                // 房间数量不足，无法生成走廊
                 return new List<CorridorData>();
             }
             
@@ -106,7 +106,7 @@ namespace CryptaGeometrica.LevelGeneration.MultiRoom
                     {
                         if (corridor.OverlapsWithRoom(room))
                         {
-                            Debug.LogWarning($"[LCorridorBuilder] 走廊 {corridor.id} 与房间 {room.id} 重叠");
+                            // 走廊与房间重叠
                             hasOverlap = true;
                             break;
                         }
@@ -120,7 +120,7 @@ namespace CryptaGeometrica.LevelGeneration.MultiRoom
                 }
             }
             
-            Debug.Log($"[LCorridorBuilder] 生成了 {corridorsBuilt} 条走廊，放置了 {platformsPlaced} 个平台");
+            // 走廊生成完成
             
             return corridors;
         }
@@ -136,7 +136,7 @@ namespace CryptaGeometrica.LevelGeneration.MultiRoom
         {
             if (fromRoom == null || toRoom == null)
             {
-                Debug.LogWarning("[LCorridorBuilder] 房间为空，无法生成走廊");
+                // 房间为空，无法生成走廊
                 return null;
             }
             
@@ -180,7 +180,7 @@ namespace CryptaGeometrica.LevelGeneration.MultiRoom
                 InjectPlatforms(corridor, effectiveJumpHeight);
             }
             
-            Debug.Log($"[LCorridorBuilder] 生成走廊: {corridor}");
+            // 生成走廊完成
             
             return corridor;
         }
@@ -199,33 +199,47 @@ namespace CryptaGeometrica.LevelGeneration.MultiRoom
             int deltaY = corridor.HeightDifference;
             int absDeltaY = Mathf.Abs(deltaY);
             
-            // 计算需要的平台数量
-            int platformCount = Mathf.CeilToInt((float)absDeltaY / effectiveJumpHeight);
+            // 确保有效跳跃高度至少为配置的平台间距
+            int maxAllowedSpacing = Mathf.Min(effectiveJumpHeight, platformSpacing);
             
-            if (platformCount <= 0) return;
+            // 计算需要的平台数量：确保每段高度差都不超过最大允许间距
+            int platformCount = Mathf.Max(0, Mathf.CeilToInt((float)(absDeltaY - maxAllowedSpacing) / maxAllowedSpacing));
             
-            // 计算平台间距
-            int spacing = absDeltaY / (platformCount + 1);
-            spacing = Mathf.Max(spacing, platformSpacing);
+            if (platformCount <= 0) 
+            {
+                Debug.Log($"[LCorridorBuilder] 走廊 {corridor.id}: 高度差 {absDeltaY} <= 跳跃能力 {effectiveJumpHeight}，无需平台");
+                return;
+            }
+            
+            // 计算实际平台间距：将总高度差均匀分配
+            float actualSpacing = (float)absDeltaY / (platformCount + 1);
             
             // 确定垂直段的起始和结束Y坐标
             int lowerY = Mathf.Min(corridor.startPoint.y, corridor.endPoint.y);
             int higherY = Mathf.Max(corridor.startPoint.y, corridor.endPoint.y);
             
+            Debug.Log($"[LCorridorBuilder] 走廊 {corridor.id}: 高度差 {absDeltaY}，生成 {platformCount} 个平台，间距 {actualSpacing:F1}");
+            
             // 在垂直段均匀放置平台
             for (int i = 1; i <= platformCount; i++)
             {
-                int platformY = lowerY + spacing * i;
+                int platformY = lowerY + Mathf.RoundToInt(actualSpacing * i);
                 
-                // 确保平台不超出垂直段范围
-                if (platformY >= higherY) break;
+                // 确保平台不超出垂直段范围，并留出安全边距
+                if (platformY >= higherY - 1) 
+                {
+                    Debug.Log($"[LCorridorBuilder] 平台 {i} 超出范围，跳过");
+                    break;
+                }
                 
                 Vector2Int platformPos = new Vector2Int(corridor.cornerPoint.x, platformY);
                 corridor.platforms.Add(platformPos);
                 platformsPlaced++;
                 
-                Debug.Log($"[LCorridorBuilder] 在走廊 {corridor.id} 放置平台: {platformPos}");
+                Debug.Log($"[LCorridorBuilder] 放置平台 {i} 在位置 ({platformPos.x}, {platformPos.y})");
             }
+            
+            Debug.Log($"[LCorridorBuilder] 走廊 {corridor.id} 平台生成完成，共放置 {corridor.platforms.Count} 个平台");
         }
         
         #endregion

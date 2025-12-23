@@ -61,13 +61,13 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
         {
             if (roomData == null)
             {
-                Debug.LogWarning("[ConnectivityGuarantor] 房间数据为空");
+                // 房间数据为空
                 return;
             }
             
             if (!parameters.enableBidirectionalWalk)
             {
-                Debug.Log("[ConnectivityGuarantor] 双向游走已禁用");
+                // 双向游走已禁用
                 return;
             }
             
@@ -95,7 +95,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
                 preferRight: false
             );
             
-            Debug.Log($"[ConnectivityGuarantor] 双向游走完成: 正向={forwardSteps}步, 反向={backwardSteps}步, 挖掘={totalTilesDug}瓦片");
+            // 双向游走完成
         }
         
         /// <summary>

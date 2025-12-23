@@ -68,7 +68,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             // 递归分割
             BSPNode root = Split(bounds, 0);
             
-            Debug.Log($"[BSPGenerator] 生成完成: 总节点={totalNodes}, 叶节点={leafNodes}, 最大深度={maxDepthReached}");
+            // BSP生成完成
             
             return root;
         }

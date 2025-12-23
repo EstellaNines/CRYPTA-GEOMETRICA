@@ -66,9 +66,9 @@ namespace CryptaGeometrica.LevelGeneration.MultiRoom
         #region 房间Y轴随机范围
         
         [TitleGroup("房间位置", "Room Position Settings", TitleAlignments.Centered)]
-        [LabelText("Y偏移范围"), MinMaxSlider(-20, 20, true)]
-        [Tooltip("战斗房间相对于基准线的Y轴随机偏移范围，增加范围可以让房间落差更大")]
-        public Vector2Int yOffsetRange = new Vector2Int(-10, 10);
+        [LabelText("Y偏移范围"), MinMaxSlider(-30, 30, true)]
+        [Tooltip("战斗房间相对于基准线的Y轴随机偏移范围，增加范围可以让房间落差更大，确保走廊不重叠")]
+        public Vector2Int yOffsetRange = new Vector2Int(-15, 15);
         
         #endregion
 

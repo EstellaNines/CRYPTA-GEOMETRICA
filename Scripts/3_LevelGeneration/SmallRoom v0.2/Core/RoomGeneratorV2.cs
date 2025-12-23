@@ -119,7 +119,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
         {
             if (targetTilemap == null || currentRoom == null)
             {
-                Debug.LogWarning("[RoomGeneratorV2] 无法烘焙：Tilemap 或房间数据为空");
+                // 无法烘焙：Tilemap 或房间数据为空
                 return;
             }
             
@@ -164,7 +164,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             // 广播消息
             BroadcastRoomAnchors();
             
-            Debug.Log("[RoomGeneratorV2] 烘焙完成");
+            // 烘焙完成
         }
         
         /// <summary>
@@ -294,7 +294,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             // 生成 BSP 树
             currentRoom.bspRoot = bspGenerator.Generate();
             
-            Debug.Log($"[RoomGeneratorV2] BSP 分割完成: 总节点={bspGenerator.TotalNodes}, 叶节点={bspGenerator.LeafNodes}, 最大深度={bspGenerator.MaxDepthReached}");
+            // BSP 分割完成
         }
         
         #endregion
@@ -315,7 +315,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             // 标记入口和出口所在的房间
             roomPlacer.MarkEntranceExitRooms(rooms, currentRoom.startPos, currentRoom.endPos);
             
-            Debug.Log($"[RoomGeneratorV2] 房间放置完成，房间数: {currentRoom.roomGraph.RoomCount}");
+            // 房间放置完成
         }
         
         #endregion
@@ -328,7 +328,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             
             if (rooms == null || rooms.Count < 2)
             {
-                Debug.LogWarning("[RoomGeneratorV2] 房间数量不足，跳过图连接");
+                // 房间数量不足，跳过图连接
                 return;
             }
             
@@ -356,10 +356,10 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             bool isConnected = MinimumSpanningTree.IsConnected(rooms, currentRoom.roomGraph.finalEdges);
             if (!isConnected)
             {
-                Debug.LogWarning("[RoomGeneratorV2] 警告：图不连通，双向游走将修复");
+                // 警告：图不连通，双向游走将修复
             }
             
-            Debug.Log($"[RoomGeneratorV2] 图连接完成: {currentRoom.roomGraph}");
+            // 图连接完成
         }
         
         #endregion
@@ -374,7 +374,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             // 生成所有走廊
             corridorBuilder.BuildCorridors(currentRoom.roomGraph, currentRoom);
             
-            Debug.Log($"[RoomGeneratorV2] 走廊生成完成: {corridorBuilder.CorridorsBuilt}条走廊, {corridorBuilder.TotalTilesDug}个瓦片");
+            // 走廊生成完成
         }
         
         #endregion
@@ -393,7 +393,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             bool isConnected = ConnectivityGuarantor.VerifyConnectivity(currentRoom);
             if (isConnected)
             {
-                Debug.Log($"[RoomGeneratorV2] 连通性验证通过: 正向={connectivityGuarantor.ForwardSteps}步, 反向={connectivityGuarantor.BackwardSteps}步");
+                // 连通性验证通过
             }
             else
             {
@@ -413,7 +413,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             // 执行平台注入
             platformInjector.InjectPlatforms(currentRoom);
             
-            Debug.Log($"[RoomGeneratorV2] 平台注入完成: 放置={platformInjector.PlatformsPlaced}, 分析落差={platformInjector.GapsAnalyzed}, 修复不可达={platformInjector.UnreachableFixed}");
+            // 平台注入完成
         }
         
         #endregion
@@ -431,7 +431,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             // 敌人生成点识别
             IdentifySpawnPoints();
             
-            Debug.Log("[RoomGeneratorV2] 后处理完成");
+            // 后处理完成
         }
         
         private void RemoveDisconnectedIslands()
@@ -521,13 +521,24 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
         {
             currentRoom.potentialSpawns.Clear();
             
+            // 开始识别生成点
+            
+            // 入口房间不生成怪物
+            if (parameters.roomType == MultiRoom.RoomType.Entrance)
+            {
+                // 入口房间不生成怪物生成点
+                return;
+            }
+            
             // 地面生成点
             IdentifyGroundSpawns();
             
             // 空中生成点
             IdentifyAirSpawns();
             
-            // 筛选
+            // 识别到潜在生成点
+            
+            // 筛选并分配敌人类型
             FilterSpawnPoints();
         }
         
@@ -555,10 +566,34 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
                         if (consecutiveFloor >= parameters.minGroundSpan)
                         {
                             int centerX = (startX + x - 1) / 2;
-                            currentRoom.potentialSpawns.Add(new SpawnPointV2(
-                                new Vector2Int(centerX, y),
+                            Vector2Int spawnPos = new Vector2Int(centerX, y);
+                            
+                            // 增加边界验证调用 (Requirements 1.1, 1.3)
+                            if (!SpawnPointValidator.IsWithinBounds(spawnPos, parameters.roomWidth, parameters.roomHeight, parameters.edgePadding))
+                            {
+                                consecutiveFloor = 0;
+                                startX = -1;
+                                continue;
+                            }
+                            
+                            // 增加环境验证调用 (Requirements 2.1, 2.2)
+                            // 验证上方3格空间和左右各1格空间
+                            if (!SpawnPointValidator.ValidateGroundEnvironment(spawnPos, currentRoom, 3, 1))
+                            {
+                                consecutiveFloor = 0;
+                                startX = -1;
+                                continue;
+                            }
+                            
+                            var newSpawn = new SpawnPointV2(
+                                spawnPos,
                                 SpawnType.Ground
-                            ) { groundSpan = consecutiveFloor });
+                            ) { 
+                                groundSpan = consecutiveFloor,
+                                isValid = true,
+                                invalidReason = string.Empty
+                            };
+                            currentRoom.potentialSpawns.Add(newSpawn);
                         }
                         consecutiveFloor = 0;
                         startX = -1;
@@ -568,27 +603,48 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
                 if (consecutiveFloor >= parameters.minGroundSpan)
                 {
                     int centerX = (startX + parameters.roomWidth - 1) / 2;
-                    currentRoom.potentialSpawns.Add(new SpawnPointV2(
-                        new Vector2Int(centerX, y),
-                        SpawnType.Ground
-                    ) { groundSpan = consecutiveFloor });
+                    Vector2Int spawnPos = new Vector2Int(centerX, y);
+                    
+                    // 增加边界验证调用 (Requirements 1.1, 1.3)
+                    if (SpawnPointValidator.IsWithinBounds(spawnPos, parameters.roomWidth, parameters.roomHeight, parameters.edgePadding))
+                    {
+                        // 增加环境验证调用 (Requirements 2.1, 2.2)
+                        if (SpawnPointValidator.ValidateGroundEnvironment(spawnPos, currentRoom, 3, 1))
+                        {
+                            var newSpawn = new SpawnPointV2(
+                                spawnPos,
+                                SpawnType.Ground
+                            ) { 
+                                groundSpan = consecutiveFloor,
+                                isValid = true,
+                                invalidReason = string.Empty
+                            };
+                            currentRoom.potentialSpawns.Add(newSpawn);
+                        }
+                    }
                 }
             }
         }
         
         private void IdentifyAirSpawns()
         {
-            for (int x = 2; x < parameters.roomWidth - 2; x++)
+            // 使用更大的边界距离，确保空中生成点远离墙壁
+            int airEdgePadding = Mathf.Max(parameters.edgePadding, 4);
+            
+            for (int x = airEdgePadding; x < parameters.roomWidth - airEdgePadding; x++)
             {
-                for (int y = 2; y < parameters.roomHeight - 2; y++)
+                for (int y = airEdgePadding; y < parameters.roomHeight - airEdgePadding; y++)
                 {
                     if (currentRoom.GetTile(x, y) != TileType.Floor) continue;
                     
-                    // 检查周围开放
-                    if (currentRoom.GetTile(x + 1, y) != TileType.Floor ||
-                        currentRoom.GetTile(x - 1, y) != TileType.Floor ||
-                        currentRoom.GetTile(x, y + 1) != TileType.Floor ||
-                        currentRoom.GetTile(x, y - 1) != TileType.Floor)
+                    Vector2Int spawnPos = new Vector2Int(x, y);
+                    
+                    // 增加边界验证调用，使用更大的边界距离 (Requirements 1.2, 1.3)
+                    if (!SpawnPointValidator.IsWithinBounds(spawnPos, parameters.roomWidth, parameters.roomHeight, airEdgePadding))
+                        continue;
+                    
+                    // 增加更大范围的环境验证（5x5区域），确保飞行怪物有足够空间 (Requirements 2.3)
+                    if (!SpawnPointValidator.ValidateAirEnvironment(spawnPos, currentRoom, 2))
                         continue;
                     
                     // 检查距地面高度
@@ -606,10 +662,15 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
                     {
                         if (random.NextDouble() < 0.15)
                         {
-                            currentRoom.potentialSpawns.Add(new SpawnPointV2(
-                                new Vector2Int(x, y),
+                            var newSpawn = new SpawnPointV2(
+                                spawnPos,
                                 SpawnType.Air
-                            ) { heightAboveGround = distToGround });
+                            ) { 
+                                heightAboveGround = distToGround,
+                                isValid = true,
+                                invalidReason = string.Empty
+                            };
+                            currentRoom.potentialSpawns.Add(newSpawn);
                         }
                     }
                 }
@@ -618,6 +679,24 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
         
         private void FilterSpawnPoints()
         {
+            // FilterSpawnPoints 开始执行
+            
+            // 在分配敌人类型前先排除安全区内的点位 (Requirements 5.1, 5.2, 5.3)
+            int safeDistance = parameters.entranceClearDepth + 2;
+            List<SpawnPointV2> validSpawns = new List<SpawnPointV2>();
+            
+            foreach (var spawn in currentRoom.potentialSpawns)
+            {
+                // 检查是否在安全区内
+                if (!SpawnPointValidator.IsInSafeZone(spawn.position, currentRoom.startPos, currentRoom.endPos, safeDistance))
+                {
+                    validSpawns.Add(spawn);
+                }
+            }
+            
+            // 使用过滤后的生成点列表
+            currentRoom.potentialSpawns = validSpawns;
+            
             // 随机打乱
             for (int i = 0; i < currentRoom.potentialSpawns.Count; i++)
             {
@@ -627,31 +706,122 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
                 currentRoom.potentialSpawns[j] = temp;
             }
             
-            // 筛选
-            List<SpawnPointV2> selected = new List<SpawnPointV2>();
+            // 分离地面和空中生成点
+            List<SpawnPointV2> groundSpawns = new List<SpawnPointV2>();
+            List<SpawnPointV2> airSpawns = new List<SpawnPointV2>();
             
             foreach (var spawn in currentRoom.potentialSpawns)
             {
-                if (selected.Count >= parameters.maxEnemies) break;
-                
-                bool tooClose = false;
-                foreach (var s in selected)
+                if (spawn.type == SpawnType.Ground)
+                    groundSpawns.Add(spawn);
+                else if (spawn.type == SpawnType.Air)
+                    airSpawns.Add(spawn);
+            }
+            
+            // 筛选生成点并分配敌人类型
+            List<SpawnPointV2> selected = new List<SpawnPointV2>();
+            
+            // 设置每种敌人的数量范围（随机）
+            int shieldbearerCount = random.Next(1, 3);  // 1-2个盾卫
+            int sharpshooterCount = random.Next(2, 4);  // 2-3个锐枪手
+            int mothCount = random.Next(1, 3);          // 1-2个飞蛾
+            
+            // 目标敌人数量设定
+            // 可用生成点统计
+            
+            // 1. 分配盾卫（地面敌人，降低空间要求）
+            int shieldbearersAssigned = 0;
+            foreach (var spawn in groundSpawns)
+            {
+                if (shieldbearersAssigned >= shieldbearerCount) break;
+                if (spawn.groundSpan >= 3 && !IsTooClose(spawn, selected))  // 降低从5到3
                 {
-                    if (Vector2Int.Distance(spawn.position, s.position) < parameters.minSpawnDistance)
+                    var newSpawn = new SpawnPointV2(spawn.position, spawn.type, EnemyType.TriangleShieldbearer);
+                    newSpawn.groundSpan = spawn.groundSpan;
+                    newSpawn.heightAboveGround = spawn.heightAboveGround;
+                    selected.Add(newSpawn);
+                    shieldbearersAssigned++;
+                }
+            }
+            
+            // 2. 分配锐枪手（地面敌人）
+            int sharpshootersAssigned = 0;
+            foreach (var spawn in groundSpawns)
+            {
+                if (sharpshootersAssigned >= sharpshooterCount) break;
+                if (!IsTooClose(spawn, selected))
+                {
+                    var newSpawn = new SpawnPointV2(spawn.position, spawn.type, EnemyType.TriangleSharpshooter);
+                    newSpawn.groundSpan = spawn.groundSpan;
+                    newSpawn.heightAboveGround = spawn.heightAboveGround;
+                    selected.Add(newSpawn);
+                    sharpshootersAssigned++;
+                }
+            }
+            
+            // 3. 分配飞蛾（优先空中生成点）
+            int mothsAssigned = 0;
+            foreach (var spawn in airSpawns)
+            {
+                if (mothsAssigned >= mothCount) break;
+                if (!IsTooClose(spawn, selected))
+                {
+                    var newSpawn = new SpawnPointV2(spawn.position, spawn.type, EnemyType.TriangleMoth);
+                    newSpawn.groundSpan = spawn.groundSpan;
+                    newSpawn.heightAboveGround = spawn.heightAboveGround;
+                    selected.Add(newSpawn);
+                    mothsAssigned++;
+                }
+            }
+            
+            // 如果空中生成点不够，飞蛾也可以在地面生成点生成
+            if (mothsAssigned < mothCount)
+            {
+                foreach (var spawn in groundSpawns)
+                {
+                    if (mothsAssigned >= mothCount) break;
+                    if (!IsTooClose(spawn, selected))
                     {
-                        tooClose = true;
-                        break;
+                        var newSpawn = new SpawnPointV2(spawn.position, spawn.type, EnemyType.TriangleMoth);
+                        newSpawn.groundSpan = spawn.groundSpan;
+                        newSpawn.heightAboveGround = spawn.heightAboveGround;
+                        selected.Add(newSpawn);
+                        mothsAssigned++;
                     }
                 }
-                
-                if (!tooClose) selected.Add(spawn);
             }
             
             currentRoom.potentialSpawns = selected;
+            
+            // 敌人配置完成
+            
+            // 输出每个分配的生成点详情
+            foreach (var spawn in selected)
+            {
+                // 分配生成点
+            }
+        }
+        
+        /// <summary>
+        /// 检查生成点是否与已选择的生成点距离过近
+        /// </summary>
+        private bool IsTooClose(SpawnPointV2 spawn, List<SpawnPointV2> selected)
+        {
+            // 降低距离限制，使用更宽松的距离要求
+            float minDistance = Mathf.Max(3f, parameters.minSpawnDistance * 0.6f);
+            
+            foreach (var s in selected)
+            {
+                if (Vector2Int.Distance(spawn.position, s.position) < minDistance)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
         
         #endregion
-
+        
         #region 烘焙
         
         private void BakeTileAt(int x, int y, Vector3Int tilePos)
@@ -781,7 +951,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
                 }
             }
             
-            Debug.Log($"[RoomGeneratorV2] 烘焙Boss门: 位置({doorX}, {doorY})，尺寸2x3，使用砖块: {doorTileToUse.name}");
+            // 烘焙Boss门完成
         }
         
         private void BakeSpawnPoints()
@@ -795,57 +965,78 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
                 DestroyImmediate(spawnContainer.gameObject);
             }
             
-            // 创建容器
-            GameObject container = new GameObject("SpawnPoints");
-            container.transform.SetParent(transform);
-            container.transform.localPosition = Vector3.zero;
+            // 创建总管理器容器
+            GameObject spawnManager = new GameObject("SpawnPointManager");
+            spawnManager.transform.SetParent(transform);
+            spawnManager.transform.localPosition = Vector3.zero;
             
-            // 为每个生成点创建可视化GameObject
+            // 添加管理器组件
+            SpawnPointManager managerComponent = spawnManager.AddComponent<SpawnPointManager>();
+            
+            // 为每个生成点创建GameObject
             for (int i = 0; i < currentRoom.potentialSpawns.Count; i++)
             {
                 SpawnPointV2 spawn = currentRoom.potentialSpawns[i];
                 
                 // 创建生成点GameObject
-                GameObject spawnObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                spawnObj.name = $"SpawnPoint_{i}_{spawn.type}";
-                spawnObj.transform.SetParent(container.transform);
+                GameObject spawnObj = new GameObject($"SpawnPoint_{i}_{spawn.enemyType}");
+                spawnObj.transform.SetParent(spawnManager.transform);
                 
                 // 设置位置
                 Vector3 worldPos = targetTilemap.CellToWorld(new Vector3Int(spawn.position.x, spawn.position.y, 0));
                 spawnObj.transform.position = worldPos + new Vector3(0.5f, 0.5f, 0);
-                spawnObj.transform.localScale = Vector3.one * 0.8f;
                 
-                // 根据类型设置颜色
-                Renderer renderer = spawnObj.GetComponent<Renderer>();
+                // 添加生成点组件
+                SpawnPoint spawnComponent = spawnObj.AddComponent<SpawnPoint>();
+                spawnComponent.Initialize(spawn, currentRoom);
+                
+                // 创建可视化子对象
+                GameObject visualObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                visualObj.name = "Visual";
+                visualObj.transform.SetParent(spawnObj.transform);
+                visualObj.transform.localPosition = Vector3.zero;
+                visualObj.transform.localScale = Vector3.one * 0.8f;
+                
+                // 根据敌人类型设置颜色
+                Renderer renderer = visualObj.GetComponent<Renderer>();
                 if (renderer != null)
                 {
                     Material mat = new Material(Shader.Find("Sprites/Default"));
                     
-                    switch (spawn.type)
+                    switch (spawn.enemyType)
                     {
-                        case SpawnType.Boss:
-                            mat.color = Color.yellow; // Boss生成点：黄色
+                        case EnemyType.CompositeGuardian:
+                            mat.color = Color.yellow; // Boss：黄色
                             break;
-                        case SpawnType.Air:
-                            mat.color = Color.magenta; // 空中小怪：粉色
+                        case EnemyType.TriangleSharpshooter:
+                            mat.color = new Color(1f, 0.5f, 0f); // 锐枪手：橙色
                             break;
-                        case SpawnType.Ground:
-                            mat.color = Color.cyan; // 地面小怪：青色
+                        case EnemyType.TriangleShieldbearer:
+                            mat.color = Color.red; // 盾卫：红色
+                            break;
+                        case EnemyType.TriangleMoth:
+                            mat.color = Color.green; // 飞蛾：绿色
+                            break;
+                        default:
+                            mat.color = spawn.type == SpawnType.Air ? Color.magenta : Color.cyan;
                             break;
                     }
                     
                     renderer.material = mat;
                 }
                 
-                // 移除碰撞体
-                Collider collider = spawnObj.GetComponent<Collider>();
+                // 移除碰撞体（保留触发器功能）
+                Collider collider = visualObj.GetComponent<Collider>();
                 if (collider != null)
                 {
-                    DestroyImmediate(collider);
+                    collider.isTrigger = true;
                 }
+                
+                // 注册到管理器
+                managerComponent.RegisterSpawnPoint(spawnComponent);
             }
             
-            Debug.Log($"[RoomGeneratorV2] 烘焙生成点: {currentRoom.potentialSpawns.Count} 个");
+            // 烘焙生成点完成
         }
         
         private void BroadcastRoomAnchors()

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using CryptaGeometrica.LevelGeneration.SmallRoomV2;
 
@@ -51,12 +52,14 @@ namespace CryptaGeometrica.LevelGeneration.MultiRoom
                 // 创建临时生成器
                 CreateTempGenerator();
                 
-                // 1. 放置入口房间（固定 Y=0）
-                Debug.Log("[LinearRoomPlacer] 放置入口房间...");
+                // 1. 放置入口房间（固定 Y=0，不生成怪物）
+                // 放置入口房间
+                var entranceParams = parameters.entranceRoomParams.Clone();
+                entranceParams.roomType = RoomType.Entrance;
                 PlacedRoom entrance = CreateRoom(
                     roomId++, 
                     RoomType.Entrance, 
-                    parameters.entranceRoomParams,
+                    entranceParams,
                     new Vector2Int(currentX, 0),
                     null
                 );
@@ -64,7 +67,7 @@ namespace CryptaGeometrica.LevelGeneration.MultiRoom
                 currentX += entrance.width + parameters.roomSpacing;
                 
                 // 2. 放置战斗房间（从种子池抽取，随机Y偏移，确保高度差至少3格）
-                Debug.Log($"[LinearRoomPlacer] 放置 {parameters.combatRoomCount} 个战斗房间...");
+                // 放置战斗房间
                 PlacedRoom previousRoom = entrance;
                 
                 for (int i = 0; i < parameters.combatRoomCount; i++)
@@ -76,10 +79,13 @@ namespace CryptaGeometrica.LevelGeneration.MultiRoom
                     // 随机Y偏移，确保与前一个房间的出入口高度差至少3格
                     int yOffset = GenerateValidYOffset(previousRoom, parameters.combatRoomParams);
                     
+                    var combatParams = parameters.combatRoomParams.Clone();
+                    combatParams.roomType = RoomType.Combat;
+                    
                     PlacedRoom combat = CreateRoom(
                         roomId++,
                         RoomType.Combat,
-                        parameters.combatRoomParams,
+                        combatParams,
                         new Vector2Int(currentX, yOffset),
                         seedStr
                     );
@@ -87,22 +93,24 @@ namespace CryptaGeometrica.LevelGeneration.MultiRoom
                     currentX += combat.width + parameters.roomSpacing;
                     previousRoom = combat;
                     
-                    Debug.Log($"[LinearRoomPlacer] 战斗房间 {i + 1}/{parameters.combatRoomCount} 放置完成, Y偏移: {yOffset}");
+                    // 战斗房间放置完成
                 }
                 
-                // 3. 放置Boss房间（确保与最后一个战斗房间高度差至少3格）
-                Debug.Log("[LinearRoomPlacer] 放置Boss房间...");
+                // 3. 放置Boss房间（确保与最后一个战斗房间高度差至少5格）
+                // 放置Boss房间
                 int bossYOffset = GenerateValidYOffset(previousRoom, parameters.bossRoomParams);
+                var bossParams = parameters.bossRoomParams.Clone();
+                bossParams.roomType = RoomType.Boss;
                 PlacedRoom boss = CreateRoom(
                     roomId++,
                     RoomType.Boss,
-                    parameters.bossRoomParams,
+                    bossParams,
                     new Vector2Int(currentX, bossYOffset),
                     null
                 );
                 level.AddRoom(boss);
                 
-                Debug.Log($"[LinearRoomPlacer] 房间放置完成, 总计 {level.RoomCount} 个房间");
+                // 房间放置完成
             }
             finally
             {
@@ -131,7 +139,7 @@ namespace CryptaGeometrica.LevelGeneration.MultiRoom
                 room.SetRoomData(roomData);
                 room.seed = seed;
                 
-                Debug.Log($"[LinearRoomPlacer] 重新生成房间 #{room.id}, 种子: {seed}");
+                // 重新生成房间
             }
             finally
             {
@@ -150,18 +158,21 @@ namespace CryptaGeometrica.LevelGeneration.MultiRoom
             {
                 CreateTempGenerator();
                 
+                
                 foreach (var room in level.rooms)
                 {
-                    var roomParams = parameters.GetParamsForRoomType(room.roomType);
+                    var roomParams = parameters.GetParamsForRoomType(room.roomType).Clone();
+                    roomParams.roomType = room.roomType;
+                    
                     string seed = room.seed ?? GenerateRandomSeed();
                     
                     RoomDataV2 roomData = GenerateRoomData(roomParams, seed);
                     room.SetRoomData(roomData);
                     
-                    Debug.Log($"[LinearRoomPlacer] 重新生成房间 #{room.id} [{room.roomType}]");
+                    // 重新生成房间
                 }
                 
-                Debug.Log($"[LinearRoomPlacer] 批量重新生成完成, 共 {level.RoomCount} 个房间");
+                // 批量重新生成完成
             }
             finally
             {
@@ -243,14 +254,35 @@ namespace CryptaGeometrica.LevelGeneration.MultiRoom
         }
         
         /// <summary>
-        /// 生成有效的Y偏移，确保与前一个房间的出入口高度差至少为走廊宽度（3格）
+        /// 根据房间索引分配难度
+        /// 前1/3房间为简单，中间1/3为标准，后1/3为困难
+        /// </summary>
+        private SmallRoomV2.RoomDifficulty GetDifficultyForRoomIndex(int index, int totalRooms)
+        {
+            if (totalRooms <= 1)
+                return SmallRoomV2.RoomDifficulty.Normal;
+            
+            float progress = (float)index / (totalRooms - 1);
+            
+            if (progress < 0.33f)
+                return SmallRoomV2.RoomDifficulty.Easy;
+            else if (progress < 0.66f)
+                return SmallRoomV2.RoomDifficulty.Normal;
+            else
+                return SmallRoomV2.RoomDifficulty.Hard;
+        }
+        
+        /// <summary>
+        /// 生成有效的Y偏移，确保与前一个房间的出入口高度差足以避免走廊重叠
         /// </summary>
         /// <param name="previousRoom">前一个房间</param>
         /// <param name="nextRoomParams">下一个房间的参数</param>
         /// <returns>有效的Y偏移</returns>
         private int GenerateValidYOffset(PlacedRoom previousRoom, RoomGenParamsV2 nextRoomParams)
         {
-            const int minHeightDiff = 3; // 走廊宽度，最小高度差
+            // 最小高度差 = 走廊高度(3) + 安全边距(2) = 5格
+            // 这样可以确保两个走廊在垂直方向不会重叠
+            const int minHeightDiff = 5; // 最小高度差，避免走廊重叠
             
             // 获取前一个房间出口的Y坐标（相对于房间底部）
             int prevExitY = previousRoom.WorldExit.y;
@@ -259,7 +291,7 @@ namespace CryptaGeometrica.LevelGeneration.MultiRoom
             // 默认入口位置约为 y=3（参考PlacedRoom.WorldEntrance的默认值）
             int nextEntranceLocalY = 3;
             
-            // 生成候选Y偏移列表（排除高度差小于3的值）
+            // 生成候选Y偏移列表（排除高度差小于5的值）
             List<int> validOffsets = new List<int>();
             
             for (int yOffset = parameters.yOffsetRange.x; yOffset <= parameters.yOffsetRange.y; yOffset++)
@@ -280,7 +312,11 @@ namespace CryptaGeometrica.LevelGeneration.MultiRoom
             // 如果有有效偏移，随机选择一个
             if (validOffsets.Count > 0)
             {
-                return validOffsets[random.Next(validOffsets.Count)];
+                int selectedOffset = validOffsets[random.Next(validOffsets.Count)];
+                int selectedEntranceY = selectedOffset + nextEntranceLocalY;
+                int actualHeightDiff = Mathf.Abs(selectedEntranceY - prevExitY);
+                Debug.Log($"[LinearRoomPlacer] 选择Y偏移 {selectedOffset}，高度差 {actualHeightDiff} >= 最小要求 {minHeightDiff}");
+                return selectedOffset;
             }
             
             // 如果没有有效偏移（范围太小），强制选择一个能满足条件的偏移
@@ -300,7 +336,7 @@ namespace CryptaGeometrica.LevelGeneration.MultiRoom
                 }
             }
             
-            Debug.LogWarning($"[LinearRoomPlacer] 无法找到高度差>=3的Y偏移，使用最大高度差: {maxDiff}");
+            Debug.LogWarning($"[LinearRoomPlacer] Y偏移范围 {parameters.yOffsetRange} 无法满足最小高度差 {minHeightDiff}，强制使用偏移 {bestOffset}，实际高度差 {maxDiff}");
             return bestOffset;
         }
         

@@ -120,6 +120,9 @@ namespace CryptaGeometrica.Tools.LevelGeneration
             // 绘制关卡边界
             DrawLevelBounds(level);
             
+            // 绘制怪物类型图例
+            DrawSpawnTypeLegend(sceneView);
+            
             // 处理输入
             HandleInput();
         }
@@ -232,24 +235,136 @@ namespace CryptaGeometrica.Tools.LevelGeneration
         {
             if (room?.roomData?.potentialSpawns == null) return;
             
+            // 入口房间不显示刷怪点
+            if (room.roomType == RoomType.Entrance) return;
+            
             var worldSpawns = room.GetWorldSpawnPoints();
             
             foreach (var spawn in worldSpawns)
             {
                 Vector3 pos = new Vector3(spawn.position.x + 0.5f, spawn.position.y + 0.5f, 0);
                 
-                // 地面刷怪点用黄色，空中刷怪点用紫色
-                if (spawn.type == SpawnType.Ground)
+                // 根据敌人类型设置颜色
+                Color spawnColor = GetEnemyTypeColor(spawn.enemyType, spawn.type);
+                Handles.color = spawnColor;
+                Handles.DrawSolidDisc(pos, Vector3.forward, 0.4f);
+                
+                // 绘制敌人类型标签
+                string label = GetEnemyTypeLabel(spawn.enemyType);
+                if (!string.IsNullOrEmpty(label))
                 {
-                    Handles.color = new Color(1f, 0.8f, 0f, 0.8f);
-                    Handles.DrawSolidDisc(pos, Vector3.forward, 0.4f);
-                }
-                else
-                {
-                    Handles.color = new Color(0.8f, 0.2f, 1f, 0.8f);
-                    Handles.DrawSolidDisc(pos, Vector3.forward, 0.4f);
+                    GUIStyle style = new GUIStyle(EditorStyles.boldLabel);
+                    style.normal.textColor = Color.white;
+                    style.fontSize = 10;
+                    style.alignment = TextAnchor.MiddleCenter;
+                    Handles.Label(pos + Vector3.up * 0.6f, label, style);
                 }
             }
+        }
+        
+        /// <summary>
+        /// 根据敌人类型获取颜色
+        /// </summary>
+        private Color GetEnemyTypeColor(EnemyType enemyType, SpawnType spawnType)
+        {
+            switch (enemyType)
+            {
+                case EnemyType.TriangleSharpshooter:
+                    return new Color(1f, 0.5f, 0f, 0.8f); // 锐枪手：橙色
+                case EnemyType.TriangleShieldbearer:
+                    return new Color(1f, 0.2f, 0.2f, 0.8f); // 盾卫：红色
+                case EnemyType.TriangleMoth:
+                    return new Color(0.2f, 1f, 0.2f, 0.8f); // 飞蛾：绿色
+                case EnemyType.CompositeGuardian:
+                    return new Color(1f, 1f, 0f, 0.8f); // Boss：黄色
+                default:
+                    // 未分配敌人类型时，根据位置类型显示
+                    return spawnType == SpawnType.Air 
+                        ? new Color(0.8f, 0.2f, 1f, 0.8f)  // 空中：紫色
+                        : new Color(0.2f, 0.8f, 0.8f, 0.8f); // 地面：青色
+            }
+        }
+        
+        /// <summary>
+        /// 获取敌人类型标签
+        /// </summary>
+        private string GetEnemyTypeLabel(EnemyType enemyType)
+        {
+            switch (enemyType)
+            {
+                case EnemyType.TriangleSharpshooter:
+                    return "枪";
+                case EnemyType.TriangleShieldbearer:
+                    return "盾";
+                case EnemyType.TriangleMoth:
+                    return "蛾";
+                case EnemyType.CompositeGuardian:
+                    return "Boss";
+                default:
+                    return "";
+            }
+        }
+        
+        /// <summary>
+        /// 绘制怪物类型图例
+        /// </summary>
+        private void DrawSpawnTypeLegend(SceneView sceneView)
+        {
+            Handles.BeginGUI();
+            
+            // 图例背景
+            GUILayout.BeginArea(new Rect(10, 10, 200, 200));
+            GUI.Box(new Rect(0, 0, 200, 200), "", EditorStyles.helpBox);
+            
+            GUILayout.BeginVertical();
+            GUILayout.Space(5);
+            GUILayout.Label("怪物生成点图例", EditorStyles.boldLabel);
+            GUILayout.Space(5);
+            
+            // 战斗房间怪物（每房间随机1-3种）
+            DrawLegendItem("锐枪手 (2-3个)", new Color(1f, 0.5f, 0f, 1f), "枪");
+            DrawLegendItem("盾卫 (1-2个)", new Color(1f, 0.2f, 0.2f, 1f), "盾");
+            DrawLegendItem("飞蛾 (1-2个)", new Color(0.2f, 1f, 0.2f, 1f), "蛾");
+            
+            // Boss房间
+            DrawLegendItem("复合守卫者", new Color(1f, 1f, 0f, 1f), "Boss");
+            
+            GUILayout.Space(5);
+            GUILayout.Label("未分配:", EditorStyles.miniLabel);
+            DrawLegendItem("地面生成点", new Color(0.2f, 0.8f, 0.8f, 1f), "");
+            DrawLegendItem("空中生成点", new Color(0.8f, 0.2f, 1f, 1f), "");
+            
+            GUILayout.EndVertical();
+            GUILayout.EndArea();
+            
+            Handles.EndGUI();
+        }
+        
+        /// <summary>
+        /// 绘制单个图例项
+        /// </summary>
+        private void DrawLegendItem(string name, Color color, string label)
+        {
+            GUILayout.BeginHorizontal();
+            
+            // 颜色方块
+            Rect colorRect = GUILayoutUtility.GetRect(16, 16, GUILayout.Width(16), GUILayout.Height(16));
+            EditorGUI.DrawRect(colorRect, color);
+            
+            // 标签
+            if (!string.IsNullOrEmpty(label))
+            {
+                GUILayout.Label($"[{label}]", GUILayout.Width(35));
+            }
+            else
+            {
+                GUILayout.Space(35);
+            }
+            
+            // 名称
+            GUILayout.Label(name, EditorStyles.miniLabel);
+            
+            GUILayout.EndHorizontal();
         }
         
         /// <summary>

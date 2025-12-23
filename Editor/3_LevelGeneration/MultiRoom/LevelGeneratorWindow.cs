@@ -352,17 +352,48 @@ namespace CryptaGeometrica.Tools.LevelGeneration
         private VisualElement CreateLegend()
         {
             var legend = new VisualElement();
-            legend.style.flexDirection = FlexDirection.Row;
-            legend.style.flexWrap = Wrap.Wrap;
+            legend.style.flexDirection = FlexDirection.Column;
             legend.style.paddingLeft = 10;
             legend.style.paddingBottom = 10;
-            legend.style.justifyContent = Justify.Center;
+            legend.style.paddingRight = 10;
             
-            legend.Add(CreateLegendItem("入口房间", new Color(0.2f, 0.8f, 0.2f)));
-            legend.Add(CreateLegendItem("战斗房间", new Color(0.8f, 0.5f, 0.2f)));
-            legend.Add(CreateLegendItem("Boss房间", new Color(0.8f, 0.2f, 0.2f)));
-            legend.Add(CreateLegendItem("走廊", new Color(0.4f, 0.4f, 0.8f)));
-            legend.Add(CreateLegendItem("重叠警告", new Color(1f, 0f, 0f)));
+            // 房间类型图例
+            var roomLegendTitle = new Label("房间类型:");
+            roomLegendTitle.style.color = Color.white;
+            roomLegendTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
+            roomLegendTitle.style.marginBottom = 5;
+            legend.Add(roomLegendTitle);
+            
+            var roomLegendRow = new VisualElement();
+            roomLegendRow.style.flexDirection = FlexDirection.Row;
+            roomLegendRow.style.flexWrap = Wrap.Wrap;
+            roomLegendRow.style.marginBottom = 10;
+            
+            roomLegendRow.Add(CreateLegendItem("入口房间", new Color(0.2f, 0.8f, 0.2f)));
+            roomLegendRow.Add(CreateLegendItem("战斗房间", new Color(0.8f, 0.5f, 0.2f)));
+            roomLegendRow.Add(CreateLegendItem("Boss房间", new Color(0.8f, 0.2f, 0.2f)));
+            roomLegendRow.Add(CreateLegendItem("走廊", new Color(0.4f, 0.4f, 0.8f)));
+            roomLegendRow.Add(CreateLegendItem("重叠警告", new Color(1f, 0f, 0f)));
+            legend.Add(roomLegendRow);
+            
+            // 怪物生成点图例
+            var spawnLegendTitle = new Label("怪物生成点:");
+            spawnLegendTitle.style.color = Color.white;
+            spawnLegendTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
+            spawnLegendTitle.style.marginBottom = 5;
+            legend.Add(spawnLegendTitle);
+            
+            var spawnLegendRow = new VisualElement();
+            spawnLegendRow.style.flexDirection = FlexDirection.Row;
+            spawnLegendRow.style.flexWrap = Wrap.Wrap;
+            
+            spawnLegendRow.Add(CreateLegendItem("锐枪手 (2-3个)", new Color(1f, 0.5f, 0f)));
+            spawnLegendRow.Add(CreateLegendItem("盾卫 (1-2个)", new Color(1f, 0.2f, 0.2f)));
+            spawnLegendRow.Add(CreateLegendItem("飞蛾 (1-2个)", new Color(0.2f, 1f, 0.2f)));
+            spawnLegendRow.Add(CreateLegendItem("复合守卫者", new Color(1f, 1f, 0f)));
+            spawnLegendRow.Add(CreateLegendItem("地面未分配", new Color(0.2f, 0.8f, 0.8f)));
+            spawnLegendRow.Add(CreateLegendItem("空中未分配", new Color(0.8f, 0.2f, 1f)));
+            legend.Add(spawnLegendRow);
             
             return legend;
         }
@@ -552,6 +583,76 @@ namespace CryptaGeometrica.Tools.LevelGeneration
                         pixels[y * texWidth + x] = borderColor;
                     }
                 }
+            }
+            
+            // 绘制刷怪点
+            DrawSpawnPointsToTexture(pixels, texWidth, texHeight, room, levelBounds, padding);
+        }
+        
+        /// <summary>
+        /// 绘制刷怪点到纹理
+        /// </summary>
+        private void DrawSpawnPointsToTexture(Color[] pixels, int texWidth, int texHeight, PlacedRoom room, RectInt levelBounds, int padding)
+        {
+            if (room?.roomData?.potentialSpawns == null) return;
+            
+            // 入口房间不显示刷怪点
+            if (room.roomType == RoomType.Entrance) return;
+            
+            int offsetX = -levelBounds.x + padding;
+            int offsetY = -levelBounds.y + padding;
+            
+            var worldSpawns = room.GetWorldSpawnPoints();
+            
+            foreach (var spawn in worldSpawns)
+            {
+                // 获取敌人类型颜色
+                Color spawnColor = GetEnemyTypeColor(spawn.enemyType, spawn.type);
+                
+                // 计算像素位置
+                int centerX = (int)((spawn.position.x + offsetX + 0.5f) * previewScale);
+                int centerY = (int)((spawn.position.y + offsetY + 0.5f) * previewScale);
+                int radius = Mathf.Max(2, (int)(previewScale * 0.4f));
+                
+                // 绘制圆形
+                for (int dx = -radius; dx <= radius; dx++)
+                {
+                    for (int dy = -radius; dy <= radius; dy++)
+                    {
+                        if (dx * dx + dy * dy <= radius * radius)
+                        {
+                            int px = centerX + dx;
+                            int py = centerY + dy;
+                            if (px >= 0 && px < texWidth && py >= 0 && py < texHeight)
+                            {
+                                pixels[py * texWidth + px] = spawnColor;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        /// <summary>
+        /// 根据敌人类型获取颜色
+        /// </summary>
+        private Color GetEnemyTypeColor(SmallRoomV2.EnemyType enemyType, SmallRoomV2.SpawnType spawnType)
+        {
+            switch (enemyType)
+            {
+                case SmallRoomV2.EnemyType.TriangleSharpshooter:
+                    return new Color(1f, 0.5f, 0f, 1f); // 锐枪手：橙色
+                case SmallRoomV2.EnemyType.TriangleShieldbearer:
+                    return new Color(1f, 0.2f, 0.2f, 1f); // 盾卫：红色
+                case SmallRoomV2.EnemyType.TriangleMoth:
+                    return new Color(0.2f, 1f, 0.2f, 1f); // 飞蛾：绿色
+                case SmallRoomV2.EnemyType.CompositeGuardian:
+                    return new Color(1f, 1f, 0f, 1f); // Boss：黄色
+                default:
+                    // 未分配敌人类型时，根据位置类型显示
+                    return spawnType == SmallRoomV2.SpawnType.Air 
+                        ? new Color(0.8f, 0.2f, 1f, 1f)  // 空中：紫色
+                        : new Color(0.2f, 0.8f, 0.8f, 1f); // 地面：青色
             }
         }
         

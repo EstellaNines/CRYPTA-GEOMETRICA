@@ -75,13 +75,13 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
         {
             if (roomData == null)
             {
-                Debug.LogWarning("[PlatformInjector] 房间数据为空");
+                // 房间数据为空
                 return;
             }
             
             if (!parameters.enableJumpAnalysis)
             {
-                Debug.Log("[PlatformInjector] 跳跃分析已禁用");
+                // 跳跃分析已禁用
                 return;
             }
             
@@ -105,7 +105,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             // Step 4: 验证可达性并修复
             FixUnreachableAreas(roomData);
             
-            Debug.Log($"[PlatformInjector] 平台注入完成: 放置={platformsPlaced}, 分析落差={gapsAnalyzed}, 修复不可达={unreachableFixed}");
+            // 平台注入完成
         }
         
         #endregion
@@ -326,7 +326,7 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
             // 检查出口是否可达
             if (!reachable.Contains(roomData.endPos))
             {
-                Debug.LogWarning("[PlatformInjector] 出口不可达，尝试修复...");
+                // 出口不可达，尝试修复
                 
                 // 在入口和出口之间的路径上添加平台
                 FixPathBetween(roomData.startPos, roomData.endPos, roomData);

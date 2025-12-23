@@ -29,6 +29,9 @@ namespace CryptaGeometrica.LevelGeneration.SmallRoomV2
         [LabelText("背景瓦片"), Tooltip("背景墙 (可选)")]
         public TileBase backgroundTile;
         
+        [LabelText("无限背景纹理"), Tooltip("用于ParallaxRawImage的无限滚动背景纹理")]
+        public Texture2D infiniteBackgroundTexture;
+        
         [LabelText("主题颜色"), Tooltip("用于编辑器预览")]
         public Color themeColor;
     }
