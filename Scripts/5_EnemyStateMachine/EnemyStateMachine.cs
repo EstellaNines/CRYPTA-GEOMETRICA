@@ -161,6 +161,20 @@ namespace CryptaGeometrica.EnemyStateMachine
             return states.ContainsKey(stateName);
         }
         
+        /// <summary>
+        /// 获取指定状态实例
+        /// </summary>
+        /// <param name="stateName">状态名称</param>
+        /// <returns>状态实例，不存在则返回null</returns>
+        public IEnemyState GetState(string stateName)
+        {
+            if (states.TryGetValue(stateName, out IEnemyState state))
+            {
+                return state;
+            }
+            return null;
+        }
+        
         #endregion
         
         #region 状态转换

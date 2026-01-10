@@ -22,6 +22,12 @@ namespace CryptaGeometrica.EnemyStateMachine.States
         [SerializeField] internal float maxFlightHeight = 15f; // 最高飞行高度（世界坐标）
         [SerializeField] internal bool useAbsoluteHeightLimits = false; // 是否使用绝对高度限制
         
+        [Header("智能路径规划")]
+        [SerializeField] internal bool enableSmartPatrol = true; // 启用智能巡逻（基于环境检测）
+        [SerializeField] internal float boundaryDetectionDistance = 2f; // 边界检测距离
+        [SerializeField] internal int pathfindingRays = 8; // 路径探测射线数量
+        [SerializeField] internal float minWaypointDistance = 1.5f; // 最小路径点距离
+        
         [Header("障碍物检测")]
         [SerializeField] internal LayerMask obstacleLayer = -1; // 障碍物层级（用于视线和碰撞检测）
         [SerializeField] internal float obstacleDetectionDistance = 1.5f; // 障碍物检测距离
@@ -71,6 +77,13 @@ namespace CryptaGeometrica.EnemyStateMachine.States
         private float circularRadius = 3f; // 圆形巡逻半径
         private float circularCenterY = 0f; // 圆形巡逻中心Y坐标
         
+        // 智能巡逻参数
+        private Vector2[] validDirections; // 有效移动方向缓存
+        private float lastBoundaryScanTime; // 上次边界扫描时间
+        private float boundaryScanInterval = 0.5f; // 边界扫描间隔
+        private Bounds movableBounds; // 可移动区域边界
+        private bool boundsInitialized = false; // 边界是否已初始化
+        
         #endregion
         
         #region 状态属性
@@ -96,6 +109,12 @@ namespace CryptaGeometrica.EnemyStateMachine.States
             lastPlayerScanTime = 0f;
             playerDetected = false;
             
+            // 初始化智能巡逻
+            if (enableSmartPatrol)
+            {
+                InitializeSmartPatrol(enemy);
+            }
+            
             // 根据巡逻模式初始化
             InitializePatrolMode(enemy);
             
@@ -107,7 +126,63 @@ namespace CryptaGeometrica.EnemyStateMachine.States
             
             if (debugMode)
             {
-                Debug.Log($"[{enemy.name}] 开始飞行巡逻 - 模式: {patrolMode}, 起始位置: {startPosition}");
+                Debug.Log($"[{enemy.name}] 开始飞行巡逻 - 模式: {patrolMode}, 智能巡逻: {enableSmartPatrol}, 起始位置: {startPosition}");
+            }
+        }
+        
+        /// <summary>
+        /// 初始化智能巡逻（检测可移动区域边界）
+        /// </summary>
+        private void InitializeSmartPatrol(EnemyController enemy)
+        {
+            validDirections = new Vector2[pathfindingRays];
+            boundsInitialized = false;
+            
+            // 扫描周围环境，确定可移动边界
+            ScanMovableBounds(enemy);
+        }
+        
+        /// <summary>
+        /// 扫描可移动区域边界
+        /// </summary>
+        private void ScanMovableBounds(EnemyController enemy)
+        {
+            Vector3 pos = enemy.transform.position;
+            
+            // 向8个方向发射射线，检测边界
+            float maxDistance = Mathf.Max(maxHorizontalPatrolDistance, maxVerticalPatrolDistance) * 2f;
+            
+            float minX = pos.x, maxX = pos.x;
+            float minY = pos.y, maxY = pos.y;
+            
+            // 检测左边界
+            RaycastHit2D hitLeft = Physics2D.Raycast(pos, Vector2.left, maxDistance, obstacleLayer);
+            minX = hitLeft.collider != null ? hitLeft.point.x + boundaryDetectionDistance : pos.x - maxHorizontalPatrolDistance;
+            
+            // 检测右边界
+            RaycastHit2D hitRight = Physics2D.Raycast(pos, Vector2.right, maxDistance, obstacleLayer);
+            maxX = hitRight.collider != null ? hitRight.point.x - boundaryDetectionDistance : pos.x + maxHorizontalPatrolDistance;
+            
+            // 检测下边界
+            RaycastHit2D hitDown = Physics2D.Raycast(pos, Vector2.down, maxDistance, obstacleLayer);
+            minY = hitDown.collider != null ? hitDown.point.y + boundaryDetectionDistance : pos.y - maxVerticalPatrolDistance;
+            
+            // 检测上边界
+            RaycastHit2D hitUp = Physics2D.Raycast(pos, Vector2.up, maxDistance, obstacleLayer);
+            maxY = hitUp.collider != null ? hitUp.point.y - boundaryDetectionDistance : pos.y + maxVerticalPatrolDistance;
+            
+            // 创建可移动边界
+            movableBounds = new Bounds(
+                new Vector3((minX + maxX) / 2f, (minY + maxY) / 2f, 0f),
+                new Vector3(maxX - minX, maxY - minY, 1f)
+            );
+            
+            boundsInitialized = true;
+            lastBoundaryScanTime = Time.time;
+            
+            if (debugMode)
+            {
+                Debug.Log($"[{enemy.name}] 扫描可移动边界: X[{minX:F1}, {maxX:F1}], Y[{minY:F1}, {maxY:F1}]");
             }
         }
         
@@ -246,43 +321,22 @@ namespace CryptaGeometrica.EnemyStateMachine.States
         }
         
         /// <summary>
-        /// 生成随机路径点（支持完整3D空间移动）
+        /// 生成随机路径点（支持智能巡逻）
         /// </summary>
         private void GenerateRandomWaypoint(EnemyController enemy)
         {
             Vector3 currentPos = enemy.transform.position;
+            Vector3 targetWaypoint;
             
-            // 在当前位置周围生成随机路径点（不限于起始位置）
-            float randomX = Random.Range(-maxHorizontalPatrolDistance, maxHorizontalPatrolDistance);
-            float randomY = Random.Range(-maxVerticalPatrolDistance, maxVerticalPatrolDistance);
-            
-            Vector3 targetWaypoint = currentPos + new Vector3(randomX, randomY, 0f);
-            
-            // 应用高度限制
-            if (useAbsoluteHeightLimits)
+            if (enableSmartPatrol && boundsInitialized)
             {
-                // 使用绝对世界坐标高度限制
-                targetWaypoint.y = Mathf.Clamp(targetWaypoint.y, minFlightHeight, maxFlightHeight);
+                // 智能巡逻：在检测到的可移动边界内生成路径点
+                targetWaypoint = GenerateSmartWaypoint(enemy, currentPos);
             }
             else
             {
-                // 使用相对于起始位置的高度限制
-                float minY = startPosition.y - maxVerticalPatrolDistance;
-                float maxY = startPosition.y + maxVerticalPatrolDistance;
-                targetWaypoint.y = Mathf.Clamp(targetWaypoint.y, minY, maxY);
-            }
-            
-            // 确保不会飞出水平巡逻范围（相对于起始位置）
-            float distanceFromStart = Vector2.Distance(
-                new Vector2(targetWaypoint.x, targetWaypoint.y),
-                new Vector2(startPosition.x, startPosition.y)
-            );
-            
-            if (distanceFromStart > maxHorizontalPatrolDistance * 1.5f)
-            {
-                // 如果太远，拉回到起始位置附近
-                Vector3 directionToStart = (startPosition - targetWaypoint).normalized;
-                targetWaypoint += directionToStart * (distanceFromStart - maxHorizontalPatrolDistance);
+                // 传统方式：基于固定参数生成
+                targetWaypoint = GenerateBasicWaypoint(enemy, currentPos);
             }
             
             currentWaypoint = targetWaypoint;
@@ -293,8 +347,90 @@ namespace CryptaGeometrica.EnemyStateMachine.States
             
             if (debugMode)
             {
-                Debug.Log($"[{enemy.name}] 生成3D随机路径点: {currentWaypoint}, 高度差: {currentWaypoint.y - currentPos.y:F2}");
+                Debug.Log($"[{enemy.name}] 生成路径点: {currentWaypoint}, 距离: {Vector3.Distance(currentPos, currentWaypoint):F2}");
             }
+        }
+        
+        /// <summary>
+        /// 智能生成路径点（基于环境检测）
+        /// </summary>
+        private Vector3 GenerateSmartWaypoint(EnemyController enemy, Vector3 currentPos)
+        {
+            // 定期重新扫描边界
+            if (Time.time - lastBoundaryScanTime > boundaryScanInterval * 5f)
+            {
+                ScanMovableBounds(enemy);
+            }
+            
+            // 在可移动边界内生成随机点
+            float targetX = Random.Range(movableBounds.min.x, movableBounds.max.x);
+            float targetY = Random.Range(movableBounds.min.y, movableBounds.max.y);
+            
+            Vector3 targetWaypoint = new Vector3(targetX, targetY, currentPos.z);
+            
+            // 确保路径点与当前位置有足够距离
+            float distance = Vector3.Distance(currentPos, targetWaypoint);
+            if (distance < minWaypointDistance)
+            {
+                // 如果太近，尝试找一个更远的点
+                Vector2 randomDir = Random.insideUnitCircle.normalized;
+                targetWaypoint = currentPos + new Vector3(randomDir.x, randomDir.y, 0f) * minWaypointDistance * 2f;
+                
+                // 限制在边界内
+                targetWaypoint.x = Mathf.Clamp(targetWaypoint.x, movableBounds.min.x, movableBounds.max.x);
+                targetWaypoint.y = Mathf.Clamp(targetWaypoint.y, movableBounds.min.y, movableBounds.max.y);
+            }
+            
+            // 验证路径是否可达（射线检测）
+            Vector2 direction = (targetWaypoint - currentPos).normalized;
+            float checkDistance = Vector3.Distance(currentPos, targetWaypoint);
+            RaycastHit2D hit = Physics2D.Raycast(currentPos, direction, checkDistance, obstacleLayer);
+            
+            if (hit.collider != null)
+            {
+                // 路径被阻挡，使用碰撞点前方作为目标
+                targetWaypoint = hit.point - direction * boundaryDetectionDistance;
+            }
+            
+            return targetWaypoint;
+        }
+        
+        /// <summary>
+        /// 基础路径点生成（传统方式）
+        /// </summary>
+        private Vector3 GenerateBasicWaypoint(EnemyController enemy, Vector3 currentPos)
+        {
+            // 在当前位置周围生成随机路径点
+            float randomX = Random.Range(-maxHorizontalPatrolDistance, maxHorizontalPatrolDistance);
+            float randomY = Random.Range(-maxVerticalPatrolDistance, maxVerticalPatrolDistance);
+            
+            Vector3 targetWaypoint = currentPos + new Vector3(randomX, randomY, 0f);
+            
+            // 应用高度限制
+            if (useAbsoluteHeightLimits)
+            {
+                targetWaypoint.y = Mathf.Clamp(targetWaypoint.y, minFlightHeight, maxFlightHeight);
+            }
+            else
+            {
+                float minY = startPosition.y - maxVerticalPatrolDistance;
+                float maxY = startPosition.y + maxVerticalPatrolDistance;
+                targetWaypoint.y = Mathf.Clamp(targetWaypoint.y, minY, maxY);
+            }
+            
+            // 确保不会飞出水平巡逻范围
+            float distanceFromStart = Vector2.Distance(
+                new Vector2(targetWaypoint.x, targetWaypoint.y),
+                new Vector2(startPosition.x, startPosition.y)
+            );
+            
+            if (distanceFromStart > maxHorizontalPatrolDistance * 1.5f)
+            {
+                Vector3 directionToStart = (startPosition - targetWaypoint).normalized;
+                targetWaypoint += directionToStart * (distanceFromStart - maxHorizontalPatrolDistance);
+            }
+            
+            return targetWaypoint;
         }
         
         /// <summary>
@@ -303,23 +439,29 @@ namespace CryptaGeometrica.EnemyStateMachine.States
         private void GenerateHorizontalWaypoint(EnemyController enemy)
         {
             Vector3 currentPos = enemy.transform.position;
+            Vector3 targetWaypoint;
             
-            // 只在水平方向生成路径点
-            float randomX = Random.Range(-maxHorizontalPatrolDistance, maxHorizontalPatrolDistance);
-            
-            Vector3 targetWaypoint = currentPos + new Vector3(randomX, 0f, 0f);
-            
-            // 限制水平范围
-            float distanceFromStartX = Mathf.Abs(targetWaypoint.x - startPosition.x);
-            if (distanceFromStartX > maxHorizontalPatrolDistance)
+            if (enableSmartPatrol && boundsInitialized)
             {
-                targetWaypoint.x = startPosition.x + Mathf.Sign(targetWaypoint.x - startPosition.x) * maxHorizontalPatrolDistance;
+                // 智能巡逻：在检测到的水平边界内生成
+                float targetX = Random.Range(movableBounds.min.x, movableBounds.max.x);
+                targetWaypoint = new Vector3(targetX, currentPos.y, currentPos.z);
+            }
+            else
+            {
+                // 传统方式
+                float randomX = Random.Range(-maxHorizontalPatrolDistance, maxHorizontalPatrolDistance);
+                targetWaypoint = currentPos + new Vector3(randomX, 0f, 0f);
+                
+                float distanceFromStartX = Mathf.Abs(targetWaypoint.x - startPosition.x);
+                if (distanceFromStartX > maxHorizontalPatrolDistance)
+                {
+                    targetWaypoint.x = startPosition.x + Mathf.Sign(targetWaypoint.x - startPosition.x) * maxHorizontalPatrolDistance;
+                }
             }
             
             currentWaypoint = targetWaypoint;
             hasReachedWaypoint = false;
-            
-            // 随机暂停时间
             currentPauseDuration = Random.Range(pauseDurationMin, pauseDurationMax);
             
             if (debugMode)
@@ -511,24 +653,30 @@ namespace CryptaGeometrica.EnemyStateMachine.States
                 {
                     // 检查视线是否被阻挡
                     Vector3 directionToPlayer = player.transform.position - enemy.transform.position;
-                    RaycastHit2D hit = Physics2D.Raycast(
-                        enemy.transform.position,
-                        directionToPlayer.normalized,
-                        detectionRange,
-                        obstacleLayer
-                    );
+                    float distanceToPlayer = directionToPlayer.magnitude;
                     
-                    // 如果射线击中的不是玩家，说明视线被阻挡
-                    if (hit.collider != null && hit.collider.gameObject != player)
+                    // 只有当obstacleLayer不是-1（所有层级）时才进行视线遮挡检测
+                    // 否则直接认为有视线
+                    if (obstacleLayer.value != -1 && obstacleLayer.value != 0)
                     {
-                        playerDetected = false;
-                    }
-                    else if (playerDetected)
-                    {
-                        if (debugMode)
+                        RaycastHit2D hit = Physics2D.Raycast(
+                            enemy.transform.position,
+                            directionToPlayer.normalized,
+                            distanceToPlayer,
+                            obstacleLayer
+                        );
+                        
+                        // 如果射线击中了障碍物（且不是玩家），说明视线被阻挡
+                        if (hit.collider != null && hit.collider.gameObject != player)
                         {
-                            Debug.Log($"[{enemy.name}] 飞行巡逻中检测到玩家！");
+                            playerDetected = false;
+                            return;
                         }
+                    }
+                    
+                    if (debugMode)
+                    {
+                        Debug.Log($"[{enemy.name}] 飞行巡逻中检测到玩家！距离: {distanceToPlayer:F2}");
                     }
                 }
             }
@@ -586,18 +734,36 @@ namespace CryptaGeometrica.EnemyStateMachine.States
             Gizmos.color = playerDetected ? Color.red : Color.yellow;
             Gizmos.DrawWireSphere(enemy.transform.position, detectionRange);
             
-            // 绘制水平巡逻范围
-            Gizmos.color = Color.cyan;
-            Gizmos.DrawWireSphere(startPosition, maxHorizontalPatrolDistance);
-            
-            // 绘制垂直巡逻范围（矩形框）
-            Gizmos.color = new Color(0f, 1f, 1f, 0.3f);
-            Vector3 patrolAreaSize = new Vector3(
-                maxHorizontalPatrolDistance * 2f,
-                maxVerticalPatrolDistance * 2f,
-                0.1f
-            );
-            Gizmos.DrawWireCube(startPosition, patrolAreaSize);
+            // 绘制可移动边界（智能巡逻）
+            if (enableSmartPatrol && boundsInitialized)
+            {
+                Gizmos.color = new Color(0f, 1f, 0f, 0.3f);
+                Gizmos.DrawWireCube(movableBounds.center, movableBounds.size);
+                
+                // 绘制边界检测射线
+                Gizmos.color = Color.green;
+                Vector3 pos = enemy.transform.position;
+                float maxDist = Mathf.Max(maxHorizontalPatrolDistance, maxVerticalPatrolDistance) * 2f;
+                Gizmos.DrawRay(pos, Vector3.left * maxDist);
+                Gizmos.DrawRay(pos, Vector3.right * maxDist);
+                Gizmos.DrawRay(pos, Vector3.up * maxDist);
+                Gizmos.DrawRay(pos, Vector3.down * maxDist);
+            }
+            else
+            {
+                // 绘制传统巡逻范围
+                Gizmos.color = Color.cyan;
+                Gizmos.DrawWireSphere(startPosition, maxHorizontalPatrolDistance);
+                
+                // 绘制垂直巡逻范围
+                Gizmos.color = new Color(0f, 1f, 1f, 0.3f);
+                Vector3 patrolAreaSize = new Vector3(
+                    maxHorizontalPatrolDistance * 2f,
+                    maxVerticalPatrolDistance * 2f,
+                    0.1f
+                );
+                Gizmos.DrawWireCube(startPosition, patrolAreaSize);
+            }
             
             // 绘制当前路径点
             if (!isPaused && (patrolMode == PatrolMode.RandomWaypoint || patrolMode == PatrolMode.HorizontalOnly))

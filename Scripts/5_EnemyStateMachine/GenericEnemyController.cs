@@ -167,7 +167,7 @@ namespace CryptaGeometrica.EnemyStateMachine
         public class StateConfig
         {
             [LabelText("🎯 状态名称")]
-            [ValueDropdown("@UnityEngine.Resources.FindObjectsOfTypeAll<GenericEnemyController>().FirstOrDefault()?.GetAvailableStates()")]
+            [ValueDropdown("GetStateOptions")]
             [InfoBox("选择要配置的敌人状态")]
             public string stateName;
             
@@ -179,6 +179,14 @@ namespace CryptaGeometrica.EnemyStateMachine
             [TextArea(2, 4)]
             [InfoBox("描述此状态的功能和行为")]
             public string description;
+            
+            /// <summary>
+            /// 获取状态选项（用于下拉菜单）
+            /// </summary>
+            private static IEnumerable<string> GetStateOptions()
+            {
+                return new string[] { "Idle", "Patrol", "Chase", "Attack", "Hurt", "Death" };
+            }
             
             public string GetStateConfigLabel()
             {
@@ -305,7 +313,7 @@ namespace CryptaGeometrica.EnemyStateMachine
         {
             if (enabledStates.Count == 0)
             {
-                // 默认启用待机和巡逻状态
+                // 默认启用待机、巡逻和追击状态
                 enabledStates.Add(new StateConfig 
                 { 
                     stateName = "Idle", 
@@ -320,19 +328,12 @@ namespace CryptaGeometrica.EnemyStateMachine
                     description = "巡逻状态 - 敌人左右巡逻移动" 
                 });
                 
-                // 根据敌人类型添加其他状态
-                switch (enemyType)
-                {
-                    case EnemyType.GroundEnemy:
-                        // 地面敌人可以添加追击、攻击等状态
-                        break;
-                    case EnemyType.FlyingEnemy:
-                        // 飞行敌人可以添加俯冲攻击等状态
-                        break;
-                    case EnemyType.BossEnemy:
-                        // Boss敌人可以添加特殊技能状态
-                        break;
-                }
+                enabledStates.Add(new StateConfig 
+                { 
+                    stateName = "Chase", 
+                    enabled = true, 
+                    description = "追击状态 - 敌人追击玩家" 
+                });
             }
         }
         
@@ -420,10 +421,10 @@ namespace CryptaGeometrica.EnemyStateMachine
                     return CreateChaseState();
                 case "Attack":
                     return CreateAttackState();
-                // case "Hurt":
-                //     return CreateHurtState();
-                // case "Death":
-                //     return CreateDeathState();
+                case "Hurt":
+                    return CreateHurtState();
+                case "Death":
+                    return CreateDeathState();
                     
                 default:
                     Debug.LogWarning($"[{enemyName}] 未知状态类型: {stateName}");
@@ -472,53 +473,146 @@ namespace CryptaGeometrica.EnemyStateMachine
         }
         
         /// <summary>
-        /// 创建追击状态（占位实现）
+        /// 创建追击状态
         /// </summary>
         private IEnemyState CreateChaseState()
         {
-            // 目前返回巡逻状态作为占位，使用追击速度
-            var chaseState = new GroundEnemyPatrolState();
-            
-            ConfigureStateParameters(chaseState, new Dictionary<string, object>
+            // 根据敌人类型创建对应的追击状态
+            if (enemyType == EnemyType.FlyingEnemy)
             {
-                { "patrolSpeed", chaseSpeed }, // 使用追击速度
-                { "patrolDuration", patrolDuration },
-                { "detectionRange", playerDetectionRange },
-                { "maxPatrolDistance", maxPatrolDistance },
-                { "groundLayer", groundLayer },
-                { "wallLayer", wallLayer },
-                { "obstacleLayer", obstacleLayer }
-            });
-            
-            if (enableStateMachineDebug)
-            {
-                Debug.Log($"[{enemyName}] 创建追击状态（使用巡逻状态，速度: {chaseSpeed}）");
+                var chaseState = new AirEnemyChaseState();
+                
+                ConfigureStateParameters(chaseState, new Dictionary<string, object>
+                {
+                    { "chaseSpeed", chaseSpeed },
+                    { "attackRange", attackRange },
+                    { "detectionRange", playerDetectionRange },
+                    { "obstacleLayer", obstacleLayer }
+                });
+                
+                if (enableStateMachineDebug)
+                {
+                    Debug.Log($"[{enemyName}] 创建飞行追击状态，速度: {chaseSpeed}");
+                }
+                
+                return chaseState;
             }
-            
-            return chaseState;
+            else
+            {
+                var chaseState = new GroundEnemyChaseState();
+                
+                ConfigureStateParameters(chaseState, new Dictionary<string, object>
+                {
+                    { "chaseSpeed", chaseSpeed },
+                    { "attackRange", attackRange },
+                    { "detectionRange", playerDetectionRange },
+                    { "groundLayer", groundLayer },
+                    { "wallLayer", wallLayer },
+                    { "obstacleLayer", obstacleLayer }
+                });
+                
+                if (enableStateMachineDebug)
+                {
+                    Debug.Log($"[{enemyName}] 创建地面追击状态，速度: {chaseSpeed}");
+                }
+                
+                return chaseState;
+            }
         }
         
         /// <summary>
-        /// 创建攻击状态（占位实现）
+        /// 创建攻击状态
         /// </summary>
         private IEnemyState CreateAttackState()
         {
-            // 目前返回待机状态作为占位，记录攻击冷却时间
-            var attackState = new GroundEnemyIdleState();
-            
-            ConfigureStateParameters(attackState, new Dictionary<string, object>
+            // 根据敌人类型创建对应的攻击状态
+            if (enemyType == EnemyType.FlyingEnemy)
             {
-                { "idleTimeout", attackCooldown }, // 使用攻击冷却时间作为待机时间
-                { "detectionRange", attackRange }, // 使用攻击范围作为检测范围
-                { "obstacleLayer", obstacleLayer }
+                var attackState = new AirEnemyAttackState();
+                
+                ConfigureStateParameters(attackState, new Dictionary<string, object>
+                {
+                    { "attackRange", attackRange },
+                    { "attackCooldown", attackCooldown },
+                    { "chaseRange", playerDetectionRange },  // 使用检测范围作为追击范围
+                    { "playerLayer", obstacleLayer }
+                });
+                
+                if (enableStateMachineDebug)
+                {
+                    Debug.Log($"[{enemyName}] 创建飞行攻击状态，攻击范围: {attackRange}，追击范围: {playerDetectionRange}");
+                }
+                
+                return attackState;
+            }
+            else
+            {
+                var attackState = new GroundEnemyAttackState();
+                
+                ConfigureStateParameters(attackState, new Dictionary<string, object>
+                {
+                    { "attackRange", attackRange },
+                    { "attackCooldown", attackCooldown },
+                    { "chaseRange", playerDetectionRange },  // 使用检测范围作为追击范围
+                    { "playerLayer", obstacleLayer }
+                });
+                
+                if (enableStateMachineDebug)
+                {
+                    Debug.Log($"[{enemyName}] 创建地面攻击状态，攻击范围: {attackRange}，追击范围: {playerDetectionRange}");
+                }
+                
+                return attackState;
+            }
+        }
+        
+        /// <summary>
+        /// 创建受伤状态
+        /// </summary>
+        private EnemyHurtState CreateHurtState()
+        {
+            var hurtState = new EnemyHurtState();
+            
+            // 配置受伤状态参数
+            ConfigureStateParameters(hurtState, new Dictionary<string, object>
+            {
+                { "hurtDuration", 0.5f },
+                { "knockbackForce", 3f },
+                { "enableKnockback", true },
+                { "flashDuration", 0.1f },
+                { "flashCount", 3 }
             });
             
             if (enableStateMachineDebug)
             {
-                Debug.Log($"[{enemyName}] 创建攻击状态（使用待机状态，冷却: {attackCooldown}）");
+                Debug.Log($"[{enemyName}] 创建受伤状态");
             }
             
-            return attackState;
+            return hurtState;
+        }
+        
+        /// <summary>
+        /// 创建死亡状态
+        /// </summary>
+        private EnemyDeathState CreateDeathState()
+        {
+            var deathState = new EnemyDeathState();
+            
+            // 配置死亡状态参数
+            ConfigureStateParameters(deathState, new Dictionary<string, object>
+            {
+                { "deathDelay", 2f },
+                { "fadeOutDuration", 1f },
+                { "flashInterval", 0.1f },
+                { "dropLootOnDeath", true }
+            });
+            
+            if (enableStateMachineDebug)
+            {
+                Debug.Log($"[{enemyName}] 创建死亡状态");
+            }
+            
+            return deathState;
         }
         
         /// <summary>
@@ -640,18 +734,47 @@ namespace CryptaGeometrica.EnemyStateMachine
         /// </summary>
         public override GameObject GetPlayerTarget()
         {
+            // 如果缓存的玩家已被销毁，清除缓存
+            if (cachedPlayer != null && cachedPlayer.Equals(null))
+            {
+                cachedPlayer = null;
+            }
+            
             if (cachedPlayer == null)
             {
+                // 方法1: 通过Player标签查找
                 cachedPlayer = GameObject.FindGameObjectWithTag("Player");
                 
+                // 方法2: 通过名称查找（备用）
+                if (cachedPlayer == null)
+                {
+                    cachedPlayer = GameObject.Find("Player");
+                }
+                
+                // 方法3: 查找PlayerController组件（备用）
+                if (cachedPlayer == null)
+                {
+                    var playerController = FindObjectOfType<MonoBehaviour>();
+                    if (playerController != null && playerController.GetType().Name.Contains("Player"))
+                    {
+                        cachedPlayer = playerController.gameObject;
+                    }
+                }
+                
+                // 方法4: 使用主摄像机作为目标（最后备用）
                 if (cachedPlayer == null && mainCamera != null)
                 {
                     cachedPlayer = mainCamera.gameObject;
                     
                     if (enableStateMachineDebug)
                     {
-                        Debug.Log($"[{enemyName}] 使用主摄像机作为玩家目标");
+                        Debug.LogWarning($"[{enemyName}] 未找到玩家，使用主摄像机作为目标");
                     }
+                }
+                
+                if (cachedPlayer != null && enableStateMachineDebug)
+                {
+                    Debug.Log($"[{enemyName}] 找到玩家目标: {cachedPlayer.name}");
                 }
             }
             
@@ -787,10 +910,26 @@ namespace CryptaGeometrica.EnemyStateMachine
             
             PlaySound("Hurt");
             
-            if (damageSource != Vector3.zero)
+            // 尝试切换到受伤状态
+            if (StateMachine.HasState("Hurt"))
             {
-                Vector3 knockbackDirection = (transform.position - damageSource).normalized;
-                ApplyKnockback(5f, knockbackDirection);
+                // 获取受伤状态并设置伤害来源
+                var hurtState = StateMachine.GetState("Hurt") as EnemyHurtState;
+                if (hurtState != null)
+                {
+                    hurtState.DamageSource = damageSource;
+                }
+                
+                StateMachine.ForceTransitionTo("Hurt");
+            }
+            else
+            {
+                // 如果没有受伤状态，使用原来的击退逻辑
+                if (damageSource != Vector3.zero)
+                {
+                    Vector3 knockbackDirection = (transform.position - damageSource).normalized;
+                    ApplyKnockback(5f, knockbackDirection);
+                }
             }
             
             Debug.Log($"[{enemyName}] 受到伤害: {damage}, 剩余生命: {CurrentHealth}");
@@ -805,16 +944,24 @@ namespace CryptaGeometrica.EnemyStateMachine
             
             PlaySound("Death");
             
-            // 死亡视觉效果 - 使用缓存的渲染器
-            if (enableVisualEffects)
-            {
-                ApplyColorToAllRenderers(Color.black);
-            }
-            
             Debug.Log($"[{enemyName}] 死亡");
             
-            // 延迟销毁
-            Invoke(nameof(DestroyEnemy), 2f);
+            // 尝试切换到死亡状态
+            if (StateMachine.HasState("Death"))
+            {
+                StateMachine.ForceTransitionTo("Death");
+            }
+            else
+            {
+                // 如果没有死亡状态，使用原来的直接实现逻辑
+                if (enableVisualEffects)
+                {
+                    ApplyColorToAllRenderers(Color.black);
+                }
+                
+                // 延迟销毁
+                Invoke(nameof(DestroyEnemy), 2f);
+            }
         }
         
         #endregion
@@ -951,7 +1098,7 @@ namespace CryptaGeometrica.EnemyStateMachine
         /// 添加默认状态配置按钮
         /// </summary>
         [FoldoutGroup("状态配置")]
-        [Button("⚡ 添加默认状态 (待机+巡逻)", ButtonSizes.Medium)]
+        [Button("⚡ 添加默认状态 (待机+巡逻+追击)", ButtonSizes.Medium)]
         [GUIColor(0.7f, 1f, 0.7f)]
         private void AddDefaultStates()
         {
@@ -969,6 +1116,13 @@ namespace CryptaGeometrica.EnemyStateMachine
                 stateName = "Patrol", 
                 enabled = true, 
                 description = "巡逻状态 - 敌人左右巡逻移动" 
+            });
+            
+            enabledStates.Add(new StateConfig 
+            { 
+                stateName = "Chase", 
+                enabled = true, 
+                description = "追击状态 - 敌人追击玩家" 
             });
             
             UnityEditor.EditorUtility.SetDirty(this);
@@ -1049,6 +1203,126 @@ namespace CryptaGeometrica.EnemyStateMachine
         [ShowIf("@Application.isPlaying")]
         [LabelText("状态标记")]
         private string StatusDisplay => $"存活:{IsAlive} | 可行动:{CanAct} | 面向:{(IsFacingRight ? "右" : "左")}";
+        
+        /// <summary>
+        /// 调试按钮 - 测试受伤状态
+        /// </summary>
+        [FoldoutGroup("运行时调试")]
+        [Button("💥 测试受伤 (造成10点伤害)", ButtonSizes.Large)]
+        [GUIColor(1f, 0.5f, 0.5f)]
+        [ShowIf("@Application.isPlaying")]
+        private void DebugTriggerHurt()
+        {
+            if (!Application.isPlaying) return;
+            
+            // 从敌人前方造成伤害
+            Vector3 damageSource = transform.position + (IsFacingRight ? Vector3.left : Vector3.right) * 2f;
+            TakeDamage(10f, damageSource);
+            Debug.Log($"[{enemyName}] 调试：触发受伤状态，伤害来源: {damageSource}");
+        }
+        
+        /// <summary>
+        /// 调试按钮 - 切换到追击状态
+        /// </summary>
+        [FoldoutGroup("运行时调试")]
+        [Button("🏃 切换到追击状态", ButtonSizes.Medium)]
+        [GUIColor(0.5f, 0.7f, 1f)]
+        [ShowIf("@Application.isPlaying")]
+        private void DebugSwitchToChase()
+        {
+            if (!Application.isPlaying) return;
+            
+            if (StateMachine.HasState("Chase"))
+            {
+                StateMachine.ForceTransitionTo("Chase");
+                Debug.Log($"[{enemyName}] 调试：切换到追击状态");
+            }
+            else
+            {
+                Debug.LogWarning($"[{enemyName}] 追击状态未启用");
+            }
+        }
+        
+        /// <summary>
+        /// 调试按钮 - 切换到攻击状态
+        /// </summary>
+        [FoldoutGroup("运行时调试")]
+        [Button("⚔️ 切换到攻击状态", ButtonSizes.Medium)]
+        [GUIColor(0.5f, 0.7f, 1f)]
+        [ShowIf("@Application.isPlaying")]
+        private void DebugSwitchToAttack()
+        {
+            if (!Application.isPlaying) return;
+            
+            if (StateMachine.HasState("Attack"))
+            {
+                StateMachine.ForceTransitionTo("Attack");
+                Debug.Log($"[{enemyName}] 调试：切换到攻击状态");
+            }
+            else
+            {
+                Debug.LogWarning($"[{enemyName}] 攻击状态未启用");
+            }
+        }
+        
+        /// <summary>
+        /// 调试按钮 - 切换到巡逻状态
+        /// </summary>
+        [FoldoutGroup("运行时调试")]
+        [Button("🚶 切换到巡逻状态", ButtonSizes.Medium)]
+        [GUIColor(0.7f, 1f, 0.7f)]
+        [ShowIf("@Application.isPlaying")]
+        private void DebugSwitchToPatrol()
+        {
+            if (!Application.isPlaying) return;
+            
+            if (StateMachine.HasState("Patrol"))
+            {
+                StateMachine.ForceTransitionTo("Patrol");
+                Debug.Log($"[{enemyName}] 调试：切换到巡逻状态");
+            }
+            else
+            {
+                Debug.LogWarning($"[{enemyName}] 巡逻状态未启用");
+            }
+        }
+        
+        /// <summary>
+        /// 调试按钮 - 切换到待机状态
+        /// </summary>
+        [FoldoutGroup("运行时调试")]
+        [Button("🧍 切换到待机状态", ButtonSizes.Medium)]
+        [GUIColor(0.7f, 1f, 0.7f)]
+        [ShowIf("@Application.isPlaying")]
+        private void DebugSwitchToIdle()
+        {
+            if (!Application.isPlaying) return;
+            
+            if (StateMachine.HasState("Idle"))
+            {
+                StateMachine.ForceTransitionTo("Idle");
+                Debug.Log($"[{enemyName}] 调试：切换到待机状态");
+            }
+            else
+            {
+                Debug.LogWarning($"[{enemyName}] 待机状态未启用");
+            }
+        }
+        
+        /// <summary>
+        /// 调试按钮 - 击杀敌人
+        /// </summary>
+        [FoldoutGroup("运行时调试")]
+        [Button("💀 击杀敌人", ButtonSizes.Medium)]
+        [GUIColor(0.3f, 0.3f, 0.3f)]
+        [ShowIf("@Application.isPlaying")]
+        private void DebugKillEnemy()
+        {
+            if (!Application.isPlaying) return;
+            
+            TakeDamage(CurrentHealth + 1f, transform.position);
+            Debug.Log($"[{enemyName}] 调试：击杀敌人");
+        }
         
         /// <summary>
         /// 打开状态机可视化窗口按钮
