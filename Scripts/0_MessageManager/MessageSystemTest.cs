@@ -23,6 +23,7 @@ public class MessageSystemTest : MonoBehaviour
         MessageManager.Instance.Register<string>(MessageDefine.TEST_MESSAGE, OnTestMessage);
         MessageManager.Instance.Register<int>("SCORE_CHANGED", OnScoreChanged);
         MessageManager.Instance.Register<PlayerTestData>("PLAYER_DATA", OnPlayerData);
+        MessageManager.Instance.Register<RoomColorThemeData>(MessageDefine.ROOM_COLOR_THEME_CHANGED, OnRoomColorThemeChanged);
         
         Debug.Log("[MessageSystemTest] 消息监听已注册");
     }
@@ -46,6 +47,7 @@ public class MessageSystemTest : MonoBehaviour
         MessageManager.Instance.Remove<string>(MessageDefine.TEST_MESSAGE, OnTestMessage);
         MessageManager.Instance.Remove<int>("SCORE_CHANGED", OnScoreChanged);
         MessageManager.Instance.Remove<PlayerTestData>("PLAYER_DATA", OnPlayerData);
+        MessageManager.Instance.Remove<RoomColorThemeData>(MessageDefine.ROOM_COLOR_THEME_CHANGED, OnRoomColorThemeChanged);
         
         Debug.Log("[MessageSystemTest] 消息监听已移除");
     }
@@ -90,6 +92,11 @@ public class MessageSystemTest : MonoBehaviour
         Debug.Log($"[PLAYER_DATA] {data}");
     }
     
+    private void OnRoomColorThemeChanged(RoomColorThemeData data)
+    {
+        Debug.Log($"[ROOM_COLOR_THEME_CHANGED] {data}");
+    }
+    
     #endregion
     
     #region 手动测试按钮（Inspector 中调用）
@@ -116,6 +123,27 @@ public class MessageSystemTest : MonoBehaviour
     {
         MessageManager.Instance.Clear();
         Debug.Log("已清除所有消息");
+    }
+    
+    [ContextMenu("测试房间颜色主题消息")]
+    public void TestRoomColorThemeMessage()
+    {
+        // 循环测试三种颜色主题
+        RoomColorTheme[] themes = { RoomColorTheme.Red, RoomColorTheme.Blue, RoomColorTheme.Yellow };
+        RoomColorTheme selectedTheme = themes[Random.Range(0, themes.Length)];
+        
+        // 创建测试消息数据
+        var themeData = new RoomColorThemeData(
+            selectedTheme,
+            null, // 背景纹理在实际使用时会被设置
+            RoomColorThemeData.GetDefaultThemeColor(selectedTheme),
+            $"测试房间 - {selectedTheme}主题",
+            1.5f
+        );
+        
+        // 发送消息
+        MessageManager.Instance.Send(MessageDefine.ROOM_COLOR_THEME_CHANGED, themeData);
+        Debug.Log($"已发送房间颜色主题测试消息: {selectedTheme}");
     }
     
     #endregion

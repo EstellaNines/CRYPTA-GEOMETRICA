@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRYPTA GEOMETRICA - 游戏流程图生成器</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            color: #00d4ff;
+            text-shadow: 0 0 10px #00d4ff;
+            margin-bottom: 30px;
+        }
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        button {
+            background: linear-gradient(45deg, #00d4ff, #0099cc);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 212, 255, 0.3);
+        }
+        #svgContainer {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid rgba(0, 212, 255, 0.3);
+        }
+        svg {
+            width: 100%;
+            height: auto;
+            background: white;
+            border-radius: 8px;
+        }
+        .node {
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .node:hover {
+            transform: scale(1.05);
+        }
+        .start-node { fill: #4CAF50; }
+        .process-node { fill: #2196F3; }
+        .decision-node { fill: #FF9800; }
+        .end-node { fill: #F44336; }
+        .success-node { fill: #9C27B0; }
+        
+        .node-text {
+            fill: white;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            text-anchor: middle;
+            dominant-baseline: central;
+        }
+        
+        .edge {
+            stroke: #333;
+            stroke-width: 2;
+            fill: none;
+            marker-end: url(#arrowhead);
+        }
+        
+        .edge-label {
+            fill: #666;
+            font-family: Arial, sans-serif;
+            font-size: 10px;
+            text-anchor: middle;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CRYPTA GEOMETRICA - 游戏流程图</h1>
+        
+        <div class="controls">
+            <button onclick="generateSVG()">生成流程图</button>
+            <button onclick="downloadSVG()">下载 SVG</button>
+            <button onclick="exportPNG()">导出 PNG</button>
+        </div>
+        
+        <div id="svgContainer">
+            <svg id="flowchart" width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+                <!-- 箭头标记定义 -->
+                <defs>
+                    <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+                            refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#333"/>
+                    </marker>
+                </defs>
+            </svg>
+        </div>
+    </div>
+
+    <script>
+        // 游戏流程图数据结构
+        const flowchartData = {
+            nodes: [
+                { id: 'start', x: 400, y: 50, width: 160, height: 40, text: 'Start New Adventure', type: 'start', shape: 'ellipse' },
+                { id: 'explore', x: 400, y: 140, width: 140, height: 40, text: 'Enter Dungeon\nExploration', type: 'process', shape: 'rect' },
+                { id: 'combat', x: 200, y: 240, width: 100, height: 40, text: 'Combat', type: 'process', shape: 'rect' },
+                { id: 'shop', x: 600, y: 240, width: 120, height: 40, text: 'Shop Purchase', type: 'process', shape: 'rect' },
+                { id: 'gold', x: 200, y: 340, width: 120, height: 40, text: 'Obtain Coins', type: 'process', shape: 'rect' },
+                { id: 'fail', x: 50, y: 340, width: 120, height: 40, text: 'Adventure Failed', type: 'end', shape: 'rect' },
+                { id: 'boss', x: 400, y: 440, width: 140, height: 40, text: 'Reach Boss Room', type: 'decision', shape: 'rect' },
+                { id: 'core', x: 400, y: 540, width: 160, height: 40, text: 'Obtain Geometric Core', type: 'success', shape: 'rect' },
+                { id: 'return', x: 600, y: 540, width: 180, height: 40, text: 'Return to Surface &\nReturn Core', type: 'process', shape: 'rect' },
+                { id: 'unlock', x: 600, y: 640, width: 200, height: 40, text: 'Permanent Progress Record/\nUnlock New Content', type: 'success', shape: 'rect' }
+            ],
+            edges: [
+                { from: 'start', to: 'explore', label: '' },
+                { from: 'explore', to: 'combat', label: 'Encounter Enemy' },
+                { from: 'explore', to: 'shop', label: 'Discover Shop' },
+                { from: 'combat', to: 'gold', label: 'Victory' },
+                { from: 'combat', to: 'fail', label: 'Death' },
+                { from: 'gold', to: 'boss', label: '' },
+                { from: 'shop', to: 'explore', label: '' },
+                { from: 'boss', to: 'core', label: 'Defeat' },
+                { from: 'boss', to: 'fail', label: 'Failure' },
+                { from: 'core', to: 'return', label: '' },
+                { from: 'return', to: 'unlock', label: '' }
+            ]
+        };
+
+        function generateSVG() {
+            const svg = document.getElementById('flowchart');
+            
+            // 清空现有内容（保留defs）
+            const defs = svg.querySelector('defs');
+            svg.innerHTML = '';
+            svg.appendChild(defs);
+            
+            // 绘制边
+            flowchartData.edges.forEach(edge => {
+                drawEdge(svg, edge);
+            });
+            
+            // 绘制节点
+            flowchartData.nodes.forEach(node => {
+                drawNode(svg, node);
+            });
+        }
+
+        function drawNode(svg, node) {
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            g.setAttribute('class', 'node');
+            g.setAttribute('transform', `translate(${node.x - node.width/2}, ${node.y - node.height/2})`);
+            
+            let shape;
+            if (node.shape === 'ellipse') {
+                shape = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+                shape.setAttribute('cx', node.width/2);
+                shape.setAttribute('cy', node.height/2);
+                shape.setAttribute('rx', node.width/2);
+                shape.setAttribute('ry', node.height/2);
+            } else {
+                shape = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                shape.setAttribute('width', node.width);
+                shape.setAttribute('height', node.height);
+                shape.setAttribute('rx', 5);
+            }
+            
+            shape.setAttribute('class', `${node.type}-node`);
+            shape.setAttribute('stroke', '#333');
+            shape.setAttribute('stroke-width', '2');
+            
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('x', node.width/2);
+            text.setAttribute('y', node.height/2);
+            text.setAttribute('class', 'node-text');
+            
+            // 处理多行文本
+            const lines = node.text.split('\n');
+            if (lines.length > 1) {
+                lines.forEach((line, index) => {
+                    const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                    tspan.textContent = line;
+                    tspan.setAttribute('x', node.width/2);
+                    tspan.setAttribute('dy', index === 0 ? '-0.3em' : '1.2em');
+                    text.appendChild(tspan);
+                });
+            } else {
+                text.textContent = node.text;
+            }
+            
+            g.appendChild(shape);
+            g.appendChild(text);
+            svg.appendChild(g);
+        }
+
+        function drawEdge(svg, edge) {
+            const fromNode = flowchartData.nodes.find(n => n.id === edge.from);
+            const toNode = flowchartData.nodes.find(n => n.id === edge.to);
+            
+            if (!fromNode || !toNode) return;
+            
+            // 计算连接点
+            let startX = fromNode.x;
+            let startY = fromNode.y + fromNode.height/2;
+            let endX = toNode.x;
+            let endY = toNode.y - toNode.height/2;
+            
+            // 调整起点和终点以避免重叠
+            if (fromNode.y < toNode.y) {
+                startY = fromNode.y + fromNode.height/2;
+                endY = toNode.y - toNode.height/2;
+            } else {
+                startY = fromNode.y - fromNode.height/2;
+                endY = toNode.y + toNode.height/2;
+            }
+            
+            // 创建路径
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            
+            // 使用贝塞尔曲线创建平滑的连线
+            const controlPoint1X = startX;
+            const controlPoint1Y = startY + (endY - startY) * 0.3;
+            const controlPoint2X = endX;
+            const controlPoint2Y = endY - (endY - startY) * 0.3;
+            
+            const pathData = `M ${startX} ${startY} C ${controlPoint1X} ${controlPoint1Y}, ${controlPoint2X} ${controlPoint2Y}, ${endX} ${endY}`;
+            path.setAttribute('d', pathData);
+            path.setAttribute('class', 'edge');
+            
+            svg.appendChild(path);
+            
+            // 添加标签
+            if (edge.label) {
+                const labelX = (startX + endX) / 2;
+                const labelY = (startY + endY) / 2;
+                
+                const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                label.setAttribute('x', labelX);
+                label.setAttribute('y', labelY);
+                label.setAttribute('class', 'edge-label');
+                label.textContent = edge.label;
+                
+                // 添加背景
+                const bbox = label.getBBox();
+                const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                bg.setAttribute('x', bbox.x - 2);
+                bg.setAttribute('y', bbox.y - 2);
+                bg.setAttribute('width', bbox.width + 4);
+                bg.setAttribute('height', bbox.height + 4);
+                bg.setAttribute('fill', 'white');
+                bg.setAttribute('stroke', 'none');
+                bg.setAttribute('rx', 2);
+                
+                svg.appendChild(bg);
+                svg.appendChild(label);
+            }
+        }
+
+        function downloadSVG() {
+            const svg = document.getElementById('flowchart');
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const svgBlob = new Blob([svgData], {type: 'image/svg+xml;charset=utf-8'});
+            const svgUrl = URL.createObjectURL(svgBlob);
+            
+            const downloadLink = document.createElement('a');
+            downloadLink.href = svgUrl;
+            downloadLink.download = 'CRYPTA_GEOMETRICA_GameFlow.svg';
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+        }
+
+        function exportPNG() {
+            const svg = document.getElementById('flowchart');
+            const svgData = new XMLSerializer().serializeToString(svg);
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            canvas.width = 800;
+            canvas.height = 600;
+            
+            img.onload = function() {
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+                
+                canvas.toBlob(function(blob) {
+                    const url = URL.createObjectURL(blob);
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = url;
+                    downloadLink.download = 'CRYPTA_GEOMETRICA_GameFlow.png';
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    document.body.removeChild(downloadLink);
+                });
+            };
+            
+            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }
+
+        // 页面加载时自动生成流程图
+        window.onload = function() {
+            generateSVG();
+        };
+    </script>
+</body>
+</html>

@@ -93,4 +93,19 @@ public static class MessageDefine
     /// 数据：RoomAnchorsData { startPos, endPos, worldStartPos, worldEndPos }
     /// </summary>
     public static readonly string ROOM_ANCHORS_UPDATE = "ROOM_ANCHORS_UPDATE";
+
+    // ========== 主题背景消息 ==========
+
+    /// <summary>
+    /// 关卡主题选择完成，通知背景管理器切换主题背景
+    /// 数据：ThemeBackgroundMessageData { themeName, backgroundTexture, themeColor }
+    /// </summary>
+    public static readonly string THEME_BACKGROUND_CHANGED = "THEME_BACKGROUND_CHANGED";
+
+    /// <summary>
+    /// 房间颜色主题变更消息
+    /// 数据：RoomColorThemeData { colorTheme, backgroundTexture, roomInfo, transitionDuration }
+    /// 用于通知无限背景系统和其他监听者房间颜色主题的变化
+    /// </summary>
+    public static readonly string ROOM_COLOR_THEME_CHANGED = "ROOM_COLOR_THEME_CHANGED";
 }
