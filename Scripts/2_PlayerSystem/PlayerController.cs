@@ -35,6 +35,10 @@ namespace CryptaGeometrica.PlayerSystem
         [Tooltip("重生点（为空则重置到 (0,0,0)）")]
         [SerializeField] private Transform respawnPoint;
 
+        [Header("Animation")]
+        [Tooltip("动画控制器组件")]
+        [SerializeField] private Animator _animator;
+
         private PlayerInputSystemManager _inputActions;
         private Rigidbody2D _rb;
         private Collider2D _col;
@@ -44,6 +48,53 @@ namespace CryptaGeometrica.PlayerSystem
         private int _remainingJumps;
         private bool _wasGrounded; // 用于检测落地瞬间
         private bool _isDropping; // 是否正在下落穿透平台
+        private bool _attackInputBuffer; // 攻击输入缓冲
+        private float _attackCooldownTimer; // 攻击冷却计时器
+        private const float ATTACK_COOLDOWN = 0.45f; // 攻击冷却时间（动画0.3秒 + 0.15秒恢复）
+        
+        /// <summary>
+        /// 玩家状态机实例
+        /// </summary>
+        private PlayerStateMachine _stateMachine;
+        
+        /// <summary>
+        /// 攻击判定组件
+        /// </summary>
+        private PlayerAttackHitbox _attackHitbox;
+        
+        #region Public Properties
+        
+        /// <summary>
+        /// 移动输入 - 供状态读取
+        /// </summary>
+        public Vector2 MoveInput => _moveInput;
+        
+        /// <summary>
+        /// 动画控制器 - 供状态控制动画
+        /// </summary>
+        public Animator Animator => _animator;
+        
+        /// <summary>
+        /// 状态机 - 供状态请求转换
+        /// </summary>
+        public PlayerStateMachine StateMachine => _stateMachine;
+        
+        /// <summary>
+        /// 是否有攻击输入 - 供状态检查（考虑冷却）
+        /// </summary>
+        public bool HasAttackInput => _attackInputBuffer && _attackCooldownTimer <= 0f;
+        
+        /// <summary>
+        /// 是否处于攻击状态 - 供移动逻辑检查
+        /// </summary>
+        public bool IsAttacking => _stateMachine?.CurrentStateName == "Attack";
+        
+        /// <summary>
+        /// 攻击判定组件 - 供状态调用
+        /// </summary>
+        public PlayerAttackHitbox AttackHitbox => _attackHitbox;
+        
+        #endregion
 
         #region Unity Lifecycle
 
@@ -51,6 +102,7 @@ namespace CryptaGeometrica.PlayerSystem
         {
             _rb = GetComponent<Rigidbody2D>();
             _col = GetComponent<Collider2D>();
+            _attackHitbox = GetComponent<PlayerAttackHitbox>();
             _remainingJumps = maxJumpCount;
             
             // 初始化输入系统
@@ -59,6 +111,34 @@ namespace CryptaGeometrica.PlayerSystem
             // 绑定移动事件
             _inputActions.GamePlay.Movement.performed += OnMovementPerformed;
             _inputActions.GamePlay.Movement.canceled += OnMovementCanceled;
+            
+            // 绑定攻击事件
+            _inputActions.GamePlay.Attack.performed += OnAttackPerformed;
+        }
+        
+        private void Start()
+        {
+            // 在 Start 中初始化状态机，确保组件已准备好
+            // 先检测一次地面状态，避免初始状态错误
+            CheckGrounded();
+            InitializeStateMachine();
+        }
+        
+        /// <summary>
+        /// 初始化状态机并注册状态
+        /// </summary>
+        private void InitializeStateMachine()
+        {
+            _stateMachine = new PlayerStateMachine();
+            _stateMachine.Initialize(this);
+            
+            // 注册状态
+            _stateMachine.RegisterState(new PlayerIdleState());
+            _stateMachine.RegisterState(new PlayerWalkState());
+            _stateMachine.RegisterState(new PlayerAttackState());
+            
+            // 设置默认状态为 Idle
+            _stateMachine.TransitionTo("Idle");
         }
 
         private void OnEnable()
@@ -71,11 +151,26 @@ namespace CryptaGeometrica.PlayerSystem
             _inputActions.Disable();
         }
 
+        private void Update()
+        {
+            // 更新攻击冷却
+            if (_attackCooldownTimer > 0f)
+            {
+                _attackCooldownTimer -= Time.deltaTime;
+            }
+            
+            // 更新状态机
+            _stateMachine?.Update();
+        }
+
         private void FixedUpdate()
         {
             CheckGrounded();
             CheckFall();
             HandleMovement();
+            
+            // 更新状态机物理逻辑
+            _stateMachine?.FixedUpdate();
         }
 
         #endregion
@@ -133,9 +228,34 @@ namespace CryptaGeometrica.PlayerSystem
         {
             _moveInput = Vector2.zero;
         }
+        
+        /// <summary>
+        /// 攻击输入回调
+        /// </summary>
+        private void OnAttackPerformed(InputAction.CallbackContext context)
+        {
+            Debug.Log($"[PlayerController] 攻击输入触发! 当前状态: {_stateMachine?.CurrentStateName}");
+            _attackInputBuffer = true;
+        }
+        
+        /// <summary>
+        /// 消费攻击输入并启动冷却（由攻击状态调用）
+        /// </summary>
+        public void ConsumeAttackInput()
+        {
+            _attackInputBuffer = false;
+            _attackCooldownTimer = ATTACK_COOLDOWN;
+        }
 
         private void HandleMovement()
         {
+            // 攻击状态下冻结水平移动
+            if (IsAttacking)
+            {
+                _rb.velocity = new Vector2(0f, _rb.velocity.y);
+                return;
+            }
+            
             // 直接修改 velocity 实现移动，保留原有的 y 轴速度（如重力影响）
             _rb.velocity = new Vector2(_moveInput.x * moveSpeed, _rb.velocity.y);
         }
@@ -171,6 +291,9 @@ namespace CryptaGeometrica.PlayerSystem
 
         private void CheckFlip()
         {
+            // 攻击状态下禁止翻转
+            if (IsAttacking) return;
+            
             // 如果输入向右且当前未向右，或者输入向左且当前向右，则翻转
             if (_moveInput.x > 0 && !_isFacingRight)
             {
