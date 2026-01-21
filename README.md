@@ -1,5 +1,36 @@
 # CRYPTA GEOMETRICA
 
+> [!CAUTION]
+> ## 🚨 项目已归档 | Project Archived
+> 
+> **此仓库已不再维护。** 本项目已被全新的重制版 (Remastered Edition) 完全替代。
+> 
+> **This repository is no longer maintained.** This project has been fully superseded by a brand-new Remastered Edition.
+> 
+> ---
+> 
+> ### ✨ 重制版亮点 | Remastered Highlights
+> 
+> 新项目采用了完全重构的代码架构，提供以下增强功能：
+> 
+> - 🏗️ **更强大的程序化生成系统** - 全新的 Level Generation V4 生成器
+> - ⚡ **性能优化** - 更高效的内存管理与异步策略
+> - 📚 **完善的文档体系** - 详尽的技术文档与 API 参考
+> 
+> ---
+> 
+> ### 🔗 前往新项目 | Visit New Project
+> 
+> <p align="center">
+>   <a href="https://github.com/EstellaNines/Crypta-Geometrica-RE">
+>     <img src="https://img.shields.io/badge/🎮_NEW-Crypta_Geometrica_RE-FF6B6B?style=for-the-badge&logo=github&logoColor=white" alt="New Repository"/>
+>   </a>
+> </p>
+> 
+> **👉 [https://github.com/EstellaNines/Crypta-Geometrica-RE](https://github.com/EstellaNines/Crypta-Geometrica-RE)**
+
+---
+
 <p align="center">
   <img src="Documents/Cover——Image.png" alt="CRYPTA GEOMETRICA" width="700"/>
 </p>
@@ -12,7 +43,7 @@
   <img src="https://img.shields.io/badge/Unity-2022.3+-black?logo=unity" alt="Unity"/>
   <img src="https://img.shields.io/badge/C%23-10.0-239120?logo=csharp" alt="C#"/>
   <img src="https://img.shields.io/badge/Platform-Windows-blue" alt="Platform"/>
-  <img src="https://img.shields.io/badge/Status-In%20Development-orange" alt="Status"/>
+  <img src="https://img.shields.io/badge/Status-Archived-red" alt="Status"/>
 </p>
 
 <p align="center">
@@ -298,4 +329,3 @@ Contributions, issues, and feature requests are welcome!
 
 <p align="center">Made with ❤️ and Unity</p>
 <p align="center">Solo Developer Project | 2025-2026</p>
-1
