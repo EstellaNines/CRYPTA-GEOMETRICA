@@ -298,3 +298,4 @@ Contributions, issues, and feature requests are welcome!
 
 <p align="center">Made with ❤️ and Unity</p>
 <p align="center">Solo Developer Project | 2025-2026</p>
+1
